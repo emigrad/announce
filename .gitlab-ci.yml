@@ -32,6 +32,7 @@ build:
 release:
   stage: release
   script:
+    - mkdir $HOME/.ssh
     - cp "$DEPLOY_KEY" $HOME/.ssh/id_rsa
     - git config --global user.email "$GITLAB_USER_EMAIL"
     - git config --global user.name "$GITLAB_USER_NAME"
