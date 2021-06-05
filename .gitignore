@@ -1,3 +1,5 @@
 .idea
+dist
+junit.xml
 coverage
 node_modules

@@ -1,6 +1,7 @@
 {
   "extends": "@tsconfig/node12",
   "include": ["src"],
+  "exclude": ["**/*.test.ts"],
   "compilerOptions": {
     "lib": ["es2019"],
     "outDir": "dist",
