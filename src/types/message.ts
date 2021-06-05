@@ -4,9 +4,13 @@ export interface Headers {
    */
   id: string
   /**
-   * When the message was published
+   * When the message was published, in ISO 8601 format
    */
-  published: Date
+  published: string
+  /**
+   * Any other metadata that should be sent with
+   */
+  [key: string]: string
 }
 
 export interface Message<Body extends {} | undefined> {

@@ -28,7 +28,7 @@ describe('Error logger', () => {
     }
     const message: Message<undefined> = {
       topic: 'foo',
-      headers: { id: '123', published: new Date() },
+      headers: { id: '123', published: new Date().toISOString() },
       body: undefined
     }
     const middleware = errorLoggerMiddleware()

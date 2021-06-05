@@ -1,6 +1,6 @@
 import { Deferred } from 'ts-deferred'
 import { Announce } from './announce'
-import { InMemory } from './backends/inMemory'
+import { InMemoryBackend } from './backends'
 import { getCompleteHeaders } from './message'
 import { errorLoggerMiddleware, loggerMiddleware } from './middleware'
 import { Backend, LeveledLogMethod, Logger, Subscriber } from './types'
@@ -14,7 +14,7 @@ describe('Announce', () => {
         topics: [topic],
         handle: jest.fn()
       }
-      const announce = new Announce(new InMemory(), [])
+      const announce = new Announce(new InMemoryBackend(), [])
 
       expect(() => announce.subscribe(subscriber)).toThrow()
     }
@@ -53,7 +53,7 @@ describe('Announce', () => {
       },
       debug: jest.fn() as LeveledLogMethod
     } as Logger
-    const announce = new Announce(new InMemory(), [
+    const announce = new Announce(new InMemoryBackend(), [
       loggerMiddleware(logger),
       errorLoggerMiddleware()
     ])

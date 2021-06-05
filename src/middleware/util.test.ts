@@ -27,7 +27,7 @@ describe('Middleware utilities', () => {
     await expect(
       wrappedSubscriber.handle(undefined, {
         topic: 'test',
-        headers: { id: 'abcd', published: new Date() }
+        headers: { id: 'abcd', published: new Date().toISOString() }
       })
     ).rejects.toBe(error)
     // This won't happen if the middlewares are applied in the wrong order

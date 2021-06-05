@@ -1,8 +1,22 @@
+import { createHash } from 'crypto'
+import { tmpdir } from 'os'
+import { resolve } from 'path'
 import { Deferred } from 'ts-deferred'
+import { promisify } from 'util'
 import { Message, Subscriber, SubscriberExtra } from '../types'
-import { InMemoryBackend } from './inMemory'
+import { FileBackend } from './file'
+import rimrafCb from 'rimraf'
 
-describe('In memory backend', () => {
+const rimraf = promisify(rimrafCb)
+
+describe('File backend', () => {
+  const hash = createHash('md5').update(__filename).digest('hex').toString()
+  const path = resolve(tmpdir(), hash)
+
+  beforeEach(async () => {
+    await rimraf(path)
+  })
+
   it('Should publish and receive messages', async () => {
     const dfd = new Deferred<[any, SubscriberExtra]>()
     const subscriber: Subscriber<{}> = {
@@ -16,9 +30,9 @@ describe('In memory backend', () => {
       body: { hello: 'world' }
     }
 
-    const inMemory = new InMemoryBackend()
-    inMemory.subscribe(subscriber)
-    await inMemory.publish(message)
+    const fileBackend = new FileBackend(path)
+    await fileBackend.subscribe(subscriber)
+    await fileBackend.publish(message)
 
     const [receivedBody, extra] = await dfd.promise
     expect(receivedBody).toBe(message.body)
@@ -57,9 +71,9 @@ describe('In memory backend', () => {
         body: { hello: 'world' }
       }
 
-      const inMemory = new InMemoryBackend()
-      inMemory.subscribe(subscriber)
-      await inMemory.publish(message)
+      const fileBackend = new FileBackend(path)
+      fileBackend.subscribe(subscriber)
+      await fileBackend.publish(message)
 
       expect(receivedMessage).toBe(expected)
     }
@@ -96,10 +110,10 @@ describe('In memory backend', () => {
       headers: { id: 'abcd', published: new Date().toISOString() },
       topic: 'foo'
     }
-    const inMemory = new InMemoryBackend()
-    inMemory.subscribe(subscriber)
+    const fileBackend = new FileBackend(path)
+    fileBackend.subscribe(subscriber)
 
-    dfds.forEach((_, seq) => inMemory.publish({ ...message, body: { seq } }))
+    dfds.forEach((_, seq) => fileBackend.publish({ ...message, body: { seq } }))
     await done
 
     expect(maxRunning).toBe(subscriber.options?.concurrency)
