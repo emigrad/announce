@@ -2,9 +2,16 @@ import { Message } from '../types'
 import { LocalBackend } from './local'
 
 /**
- * An in-memory backend. Not intended for production use because the broker is not
- * backed by any persistent storage - ie data loss can occur when the application
- * shuts down
+ * An in-memory backend for running tests etc. Not suitable for production
+ * use as application shut downs can cause the loss of unprocessed messages
+ *
+ * Supports:
+ *
+ * Does not support:
+ *  - guaranteed delivery
+ *  - dead letter queues
+ *  - inter-service messaging
+ *  - multiple instances
  */
 export class InMemoryBackend extends LocalBackend {
   /**

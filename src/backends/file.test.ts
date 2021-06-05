@@ -118,4 +118,102 @@ describe('File backend', () => {
 
     expect(maxRunning).toBe(subscriber.options?.concurrency)
   })
+
+  it('Should redeliver messages that did not complete processing', async () => {
+    const dfd = new Deferred()
+    const subscriber1: Subscriber<{}> = {
+      name: 'test',
+      topics: ['foo.bar'],
+      handle: () => new Promise(() => {})
+    }
+    const subscriber2: Subscriber<{}> = {
+      name: 'test',
+      topics: ['foo.bar'],
+      handle: () => dfd.resolve()
+    }
+    const message: Message<{}> = {
+      headers: { id: 'abcd', published: new Date().toISOString() },
+      topic: 'foo.bar',
+      body: { hello: 'world' }
+    }
+
+    const fileBackend1 = new FileBackend(path)
+    await fileBackend1.subscribe(subscriber1)
+    await fileBackend1.publish(message)
+
+    const fileBackend2 = new FileBackend(path)
+    await fileBackend2.subscribe(subscriber2)
+
+    await dfd.promise
+  })
+
+  it('Should not redeliver messages that were successfully processed', async () => {
+    const dfd = new Deferred()
+    let handleCount = 0
+    const subscriber: Subscriber<{}> = {
+      name: 'test',
+      topics: ['foo.bar'],
+      handle: () => {
+        handleCount++
+        dfd.resolve()
+      }
+    }
+    const message: Message<{}> = {
+      headers: { id: 'abcd', published: new Date().toISOString() },
+      topic: 'foo.bar',
+      body: { hello: 'world' }
+    }
+
+    const fileBackend1 = new FileBackend(path)
+    await fileBackend1.subscribe(subscriber)
+    await fileBackend1.publish(message)
+    await dfd.promise
+
+    const fileBackend2 = new FileBackend(path)
+    await fileBackend2.subscribe(subscriber)
+
+    expect(handleCount).toBe(1)
+  })
+
+  it.each([false, true])(
+    'Should send rejected messages to the dead letter queue (currently subscribed: %p)',
+    async (currentlySubscribed) => {
+      const subscriberDfd = new Deferred()
+      const dlqSubscriberDfd = new Deferred()
+      const subscriber: Subscriber<{}> = {
+        name: 'test',
+        topics: ['foo.bar'],
+        handle: () => {
+          subscriberDfd.resolve()
+          return Promise.reject()
+        }
+      }
+      const dlqSubscriber: Subscriber<{}> = {
+        name: 'test.dlq',
+        topics: [],
+        handle: () => dlqSubscriberDfd.resolve()
+      }
+      const message: Message<{}> = {
+        headers: { id: 'abcd', published: new Date().toISOString() },
+        topic: 'foo.bar',
+        body: { hello: 'world' }
+      }
+
+      const fileBackend = new FileBackend(path)
+      await fileBackend.subscribe(subscriber)
+
+      if (currentlySubscribed) {
+        await fileBackend.subscribe(dlqSubscriber)
+      }
+
+      await fileBackend.publish(message)
+      await subscriberDfd.promise
+
+      if (!currentlySubscribed) {
+        await fileBackend.subscribe(dlqSubscriber)
+      }
+
+      await subscriberDfd.promise
+    }
+  )
 })

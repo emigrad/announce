@@ -20,6 +20,19 @@ const writeFile = promisify(writeFileCb)
 
 const fileIdHeader = 'x-file-id'
 
+/**
+ * A backend that's backed by the filesystem to ensure at-least-once delivery.
+ * This backend is suitable for light production use where there is only a
+ * single instance of the backend running.
+ *
+ * Supports:
+ *  - guaranteed delivery
+ *  - dead letter queues
+ *
+ * Does not support:
+ *  - inter-service messaging
+ *  - multiple instances
+ */
 export class FileBackend extends LocalBackend {
   private readonly queuePath: string
 
