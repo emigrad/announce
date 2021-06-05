@@ -15,5 +15,5 @@ export abstract class AbstractMessage<Body extends {}>
 }
 
 export function getCompleteHeaders(headers?: Partial<Headers>): Headers {
-  return { id: cuid(), published: new Date(), ...headers }
+  return { id: cuid(), published: new Date().toISOString(), ...headers }
 }

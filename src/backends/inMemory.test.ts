@@ -1,6 +1,6 @@
 import { Deferred } from 'ts-deferred'
 import { Message, Subscriber, SubscriberExtra } from '../types'
-import { InMemory } from './inMemory'
+import { InMemoryBackend } from './inMemory'
 
 describe('In memory backend', () => {
   it('Should publish and receive messages', async () => {
@@ -11,12 +11,12 @@ describe('In memory backend', () => {
       handle: (message, extra) => dfd.resolve([message, extra])
     }
     const message: Message<{}> = {
-      headers: { id: 'abcd', published: new Date() },
+      headers: { id: 'abcd', published: new Date().toISOString() },
       topic: 'foo.bar',
       body: { hello: 'world' }
     }
 
-    const inMemory = new InMemory()
+    const inMemory = new InMemoryBackend()
     inMemory.subscribe(subscriber)
     await inMemory.publish(message)
 
@@ -52,12 +52,12 @@ describe('In memory backend', () => {
         handle: () => (receivedMessage = true)
       }
       const message: Message<{}> = {
-        headers: { id: 'abcd', published: new Date() },
+        headers: { id: 'abcd', published: new Date().toISOString() },
         topic,
         body: { hello: 'world' }
       }
 
-      const inMemory = new InMemory()
+      const inMemory = new InMemoryBackend()
       inMemory.subscribe(subscriber)
       await inMemory.publish(message)
 
@@ -93,10 +93,10 @@ describe('In memory backend', () => {
       options: { concurrency: 2 }
     }
     const message: Omit<Message<{}>, 'body'> = {
-      headers: { id: 'abcd', published: new Date() },
+      headers: { id: 'abcd', published: new Date().toISOString() },
       topic: 'foo'
     }
-    const inMemory = new InMemory()
+    const inMemory = new InMemoryBackend()
     inMemory.subscribe(subscriber)
 
     dfds.forEach((_, seq) => inMemory.publish({ ...message, body: { seq } }))

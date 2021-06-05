@@ -8,7 +8,9 @@ describe('Abstract message', () => {
     expect(message.body).toBe(body)
     expect(message.topic).toBe('test')
     expect(message.headers.id.length).toBeGreaterThan(10)
-    expect(+message.headers.published).toBeGreaterThan(10000000)
+    expect(
+      message.headers.published > new Date('2010-01-01').toISOString()
+    ).toBe(true)
   })
 })
 

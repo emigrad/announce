@@ -10,5 +10,5 @@ export interface Backend {
   /**
    * Adds the subscriber
    */
-  subscribe(subscriber: Subscriber<any, any>): void
+  subscribe(subscriber: Subscriber<any, any>): Promise<void>
 }
