@@ -3,14 +3,18 @@ import {
   Logger,
   Message,
   NextFunction,
-  Subscriber
+  Subscriber,
+  SubscriberExtra
 } from '../types'
 import { loggerMiddleware } from './logger'
 
 describe('Logger middleware', () => {
   it('Should add its logger instance', () => {
     const logger = { info: jest.fn() as LeveledLogMethod } as Logger
-    const subscriber: Subscriber<undefined, { logger: Logger }> = {
+    const subscriber: Subscriber<
+      undefined,
+      SubscriberExtra & { logger: Logger }
+    > = {
       name: 'foo',
       topics: ['foo'],
       handle: jest.fn()
@@ -20,7 +24,8 @@ describe('Logger middleware', () => {
     }
     const message: Message<undefined> = {
       topic: 'foo',
-      headers: { id: '123', published: new Date() }
+      headers: { id: '123', published: new Date() },
+      body: undefined
     }
     const middleware = loggerMiddleware(logger)
     middleware(subscriber)(

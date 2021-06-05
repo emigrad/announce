@@ -1,8 +1,8 @@
 import cuid from 'cuid'
-import { Headers, MessageWithBody } from '../types'
+import { Headers, Message } from '../types'
 
 export abstract class AbstractMessage<Body extends {}>
-  implements MessageWithBody<Body>
+  implements Message<Body>
 {
   public abstract topic: string
   public headers: Headers

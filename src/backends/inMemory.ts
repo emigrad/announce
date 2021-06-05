@@ -1,5 +1,5 @@
 import PromiseQueue from 'promise-queue'
-import { Backend, Message, MessageWithBody, Subscriber } from '../types'
+import { Backend, Message, Subscriber } from '../types'
 
 interface SubscriberWithQueue extends Subscriber<any, any> {
   queue: PromiseQueue
@@ -20,7 +20,7 @@ export class InMemory implements Backend {
     this.getMatchingSubscribers(message.topic).forEach(({ queue, handle }) =>
       queue.add(async () => {
         try {
-          await handle((message as MessageWithBody<any>).body, { ...message })
+          await handle((message as Message<any>).body, { ...message })
         } catch (e) {
           // Squelch - use middleware to process errors
         }

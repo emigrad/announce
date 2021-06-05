@@ -8,9 +8,10 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "rm -rf dist; tsc",
-    "check": "run-p check:format check:lint",
+    "check": "run-p check:format check:lint check:tests",
     "check:format": "prettier --check \"src/**/*.{ts,json,md}\"",
     "check:lint": "eslint",
+    "check:tests": "tsc -p tsconfig.tests.json",
     "format": "prettier --write \"src/**/*.{ts,json,md}\"",
     "prepublishOnly": "run-p check test build",
     "test": "jest",
