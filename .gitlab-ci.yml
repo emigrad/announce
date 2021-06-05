@@ -41,6 +41,7 @@ release:
     - git config --global user.name "$GITLAB_USER_NAME"
     - yarn
     - yarn release
+    - git push --follow-tags origin master
   only:
     - main
   when: manual

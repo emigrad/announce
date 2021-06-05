@@ -66,10 +66,5 @@
     ],
     "rootDir": "src"
   },
-  "prettier": "prettier-config-standard",
-  "standard-version": {
-    "scripts": {
-      "postcommit": "git push origin --tags"
-    }
-  }
+  "prettier": "prettier-config-standard"
 }
