@@ -13,11 +13,12 @@
     "check:lint": "eslint",
     "check:tests": "tsc -p tsconfig.tests.json",
     "format": "prettier --write \"src/**/*.{ts,json,md}\"",
-    "prepublishOnly": "run-p check test build",
+    "prepublishOnly": "run-p check test build && git push origin --tags",
     "test": "jest",
     "test:ci": "jest --ci --collectCoverage",
     "test:watch": "jest --watch",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "release": "standard-version"
   },
   "dependencies": {
     "cuid": "^2.1.8",
@@ -65,5 +66,10 @@
     ],
     "rootDir": "src"
   },
-  "prettier": "prettier-config-standard"
+  "prettier": "prettier-config-standard",
+  "standard-version": {
+    "scripts": {
+      "postcommit": "yarn publish"
+    }
+  }
 }
