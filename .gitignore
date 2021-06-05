@@ -3,3 +3,4 @@ dist
 junit.xml
 coverage
 node_modules
+yarn-error.log
