@@ -1,7 +1,7 @@
 {
   "name": "@emigrad/announce",
   "version": "1.0.0",
-  "main": "dist/index.js",
+  "main": "dist/announce.js",
   "files": [
     "dist"
   ],
