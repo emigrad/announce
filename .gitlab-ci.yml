@@ -42,11 +42,10 @@ release:
   when: manual
 
 publish:
-  stage: build
+  stage: release
   script:
     - 'echo //gitlab.com/api/v4/projects/${CI_PROJECT_ID}/packages/npm/:_authToken=${CI_JOB_TOKEN} >> ~/.npmrc'
     - yarn
     - yarn publish
-  only:
-    - main
-    - tags
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_TAG
