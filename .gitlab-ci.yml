@@ -2,7 +2,7 @@ image: node:14-buster
 
 stages:
   - build
-  - publish
+  - release
 
 test:
   stage: build
@@ -29,11 +29,10 @@ build:
     paths:
       - dist
 
-publish:
-  stage: publish
+release:
+  stage: release
   script:
-    - 'echo @emigrad:registry=https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/packages/npm/ >> ~/.npmrc'
-    - 'echo //gitlab.com/api/v4/projects/${CI_PROJECT_ID}/packages/npm/:_authToken=${CI_JOB_TOKEN} >> ~/.npmrc'
+    - cp "$DEPLOY_KEY" $HOME/.ssh/id_rsa
     - git config --global user.email "$GITLAB_USER_EMAIL"
     - git config --global user.name "$GITLAB_USER_NAME"
     - yarn
@@ -41,4 +40,13 @@ publish:
   only:
     - main
   when: manual
-  allow_failure: false
+
+publish:
+  stage: publish
+  script:
+    - 'echo //gitlab.com/api/v4/projects/${CI_PROJECT_ID}/packages/npm/:_authToken=${CI_JOB_TOKEN} >> ~/.npmrc'
+    - yarn
+    - yarn publish
+  only:
+    - main
+    - tags
