@@ -41,6 +41,7 @@ release:
   only:
     - main
   when: manual
+  allow_failure: false
 
 publish:
   stage: release
