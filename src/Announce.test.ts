@@ -65,8 +65,8 @@ describe('Announce', () => {
       errorLoggerMiddleware()
     ])
 
-    announce.subscribe(subscriber)
-    announce.publish({
+    await announce.subscribe(subscriber)
+    await announce.publish({
       topic: 'foo',
       body: { hi: 'there' },
       headers: getCompleteHeaders()
