@@ -4,7 +4,7 @@ import { resolve } from 'path'
 import { Deferred } from 'ts-deferred'
 import { promisify } from 'util'
 import { Message, Subscriber, SubscriberExtra } from '../types'
-import { FileBackend } from './file'
+import { FileBackend } from './FileBackend'
 import rimrafCb from 'rimraf'
 
 const rimraf = promisify(rimrafCb)

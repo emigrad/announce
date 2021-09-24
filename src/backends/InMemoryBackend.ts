@@ -1,5 +1,5 @@
 import { Message } from '../types'
-import { LocalBackend } from './local'
+import { LocalBackend } from './LocalBackend'
 
 /**
  * An in-memory backend for running tests etc. Not suitable for production

@@ -10,7 +10,7 @@ import { resolve } from 'path'
 import { promisify } from 'util'
 import { getDeadLetterQueue, hasDeadLetterQueue } from '../selectors'
 import { Logger, Message, Subscriber } from '../types'
-import { LocalBackend, SubscriberWithQueue } from './local'
+import { LocalBackend, SubscriberWithQueue } from './LocalBackend'
 
 const mkdir = promisify(mkdirCb)
 const readdir = promisify(readdirCb)

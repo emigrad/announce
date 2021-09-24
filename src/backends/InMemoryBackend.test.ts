@@ -1,6 +1,6 @@
 import { Deferred } from 'ts-deferred'
 import { Message, Subscriber, SubscriberExtra } from '../types'
-import { InMemoryBackend } from './inMemory'
+import { InMemoryBackend } from './InMemoryBackend'
 
 describe('In memory backend', () => {
   it('Should publish and receive messages', async () => {

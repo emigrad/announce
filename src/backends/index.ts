@@ -1,3 +1,3 @@
-export * from './file'
-export * from './inMemory'
+export * from './FileBackend'
+export * from './InMemoryBackend'
 export * from './RabbitMQBackend'
