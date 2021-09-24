@@ -5,6 +5,8 @@ stages:
   - release
 
 test:
+  services:
+    - rabbitmq:3-management-alpine
   stage: build
   script:
     - yarn
