@@ -1,11 +1,15 @@
 import { Deferred } from 'ts-deferred'
-import { Announce } from './announce'
+import { Announce } from './Announce'
 import { InMemoryBackend } from './backends'
 import { getCompleteHeaders } from './message'
 import { errorLoggerMiddleware, loggerMiddleware } from './middleware'
-import { Backend, LeveledLogMethod, Logger, Subscriber } from './types'
+import { LeveledLogMethod, Logger, Subscriber } from './types'
 
 describe('Announce', () => {
+  beforeEach(() => {
+    delete process.env.ANNOUNCE_BACKEND_URL
+  })
+
   it.each(['***', ' hello', '..foo', '.bar', 'bar.', 'something-else'])(
     'Should reject subscribers that listen to invalid topic %p',
     (topic) => {
@@ -14,7 +18,7 @@ describe('Announce', () => {
         topics: [topic],
         handle: jest.fn()
       }
-      const announce = new Announce(new InMemoryBackend(), [])
+      const announce = new Announce('memory://', [])
 
       expect(() => announce.subscribe(subscriber)).toThrow()
     }
@@ -23,9 +27,12 @@ describe('Announce', () => {
   it.each(['***', ' hello', '..foo', '.bar', 'bar.', 'something-else'])(
     'Should reject attempts to send messages to invalid topic %p',
     (topic) => {
-      const publish = jest.fn()
-      const backend = { publish, subscribe: jest.fn() } as Backend
-      const announce = new Announce(backend, [])
+      const backend = new InMemoryBackend()
+      backend.publish = jest.fn()
+
+      const announce = new Announce('test://', [], {
+        backendFactory: { getBackend: () => backend }
+      })
 
       expect(() =>
         announce.publish({
@@ -53,7 +60,7 @@ describe('Announce', () => {
       },
       debug: jest.fn() as LeveledLogMethod
     } as Logger
-    const announce = new Announce(new InMemoryBackend(), [
+    const announce = new Announce('memory://', [
       loggerMiddleware(logger),
       errorLoggerMiddleware()
     ])
@@ -66,5 +73,31 @@ describe('Announce', () => {
     })
 
     expect(await dfd.promise).toEqual(['Error processing message', { error }])
+  })
+
+  it('Should throw an error if the URL is not defined', () => {
+    expect(() => new Announce()).toThrow(Error)
+  })
+
+  it('Should read backend URL from ANNOUNCE_BACKEND_URL', () => {
+    const backendUrl = 'blah://'
+    process.env.ANNOUNCE_BACKEND_URL = backendUrl
+
+    const backendFactory = {
+      getBackend: jest.fn().mockReturnValue(new InMemoryBackend())
+    }
+
+    new Announce(undefined, [], { backendFactory })
+    expect(backendFactory.getBackend).toHaveBeenCalledWith(backendUrl)
+  })
+
+  it('Should immediately throw an error if the URL is unsupported', () => {
+    const backendUrl = 'blah://'
+    const backendFactory = { getBackend: jest.fn() }
+
+    expect(() => new Announce(backendUrl, [], { backendFactory })).toThrow(
+      Error
+    )
+    expect(backendFactory.getBackend).toHaveBeenCalledWith(backendUrl)
   })
 })

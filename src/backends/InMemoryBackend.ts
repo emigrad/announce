@@ -14,6 +14,14 @@ import { LocalBackend } from './LocalBackend'
  *  - multiple instances
  */
 export class InMemoryBackend extends LocalBackend {
+  static accepts(url: string) {
+    return url.startsWith('memory://')
+  }
+
+  constructor() {
+    super()
+  }
+
   /**
    * Publishes the message to all interested subscribers
    */

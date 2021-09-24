@@ -36,6 +36,10 @@ const fileIdHeader = 'x-file-id'
 export class FileBackend extends LocalBackend {
   private readonly queuePath: string
 
+  static accepts(url: string) {
+    return url.startsWith('file://')
+  }
+
   constructor(path: string) {
     super()
 

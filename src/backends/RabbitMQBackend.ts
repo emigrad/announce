@@ -25,6 +25,10 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
   private publishChannel: PromiseLike<ConfirmChannel> | undefined
   private closePromise: Promise<void> | undefined
 
+  static accepts(url: string) {
+    return url.startsWith('amqp://')
+  }
+
   constructor(url: string, { exchange = 'events' }: RabbitMQOptions = {}) {
     super()
 

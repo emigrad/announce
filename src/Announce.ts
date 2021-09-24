@@ -1,11 +1,32 @@
+import { BackendFactory } from './backends/BackendFactory'
 import { applyMiddlewares } from './middleware'
 import { Backend, Message, Middleware, Subscriber } from './types'
 
+export interface AnnounceOptions {
+  backendFactory?: Pick<BackendFactory, 'getBackend'>
+}
+
 export class Announce {
+  private readonly backend: Backend
+
   constructor(
-    private readonly backend: Backend,
-    private readonly middlewares: Middleware<any, any>[]
-  ) {}
+    private readonly url: string = process.env.ANNOUNCE_BACKEND_URL!,
+    private readonly middlewares: Middleware<any, any>[] = [],
+    private readonly options: AnnounceOptions = {}
+  ) {
+    const { backendFactory = new BackendFactory() } = options
+    const backend = backendFactory.getBackend(url ?? '')
+
+    if (!url) {
+      throw new Error(
+        'Backend URL not defined - did you set ANNOUNCE_BACKEND_URL?'
+      )
+    } else if (!backend) {
+      throw new Error(`Unsupported backend url: ${url}`)
+    }
+
+    this.backend = backend
+  }
 
   publish(message: Message<any>) {
     if (!isValidTopic(message.topic)) {
