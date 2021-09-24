@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events'
 import PromiseQueue from 'promise-queue'
 import { Backend, Message, Subscriber } from '../types'
 
@@ -5,7 +6,7 @@ export interface SubscriberWithQueue extends Subscriber<any, any> {
   queue: PromiseQueue
 }
 
-export abstract class LocalBackend implements Backend {
+export abstract class LocalBackend extends EventEmitter implements Backend {
   protected readonly subscribers: SubscriberWithQueue[] = []
 
   abstract publish(message: Message<any>): Promise<void>

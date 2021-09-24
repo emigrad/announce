@@ -9,7 +9,7 @@ import {
 import { resolve } from 'path'
 import { promisify } from 'util'
 import { getDeadLetterQueue, hasDeadLetterQueue } from '../selectors'
-import { Logger, Message, Subscriber } from '../types'
+import { Message, Subscriber } from '../types'
 import { LocalBackend, SubscriberWithQueue } from './LocalBackend'
 
 const mkdir = promisify(mkdirCb)
@@ -36,7 +36,7 @@ const fileIdHeader = 'x-file-id'
 export class FileBackend extends LocalBackend {
   private readonly queuePath: string
 
-  constructor(path: string, private readonly logger?: Logger) {
+  constructor(path: string) {
     super()
 
     this.queuePath = resolve(path, 'queues')
@@ -134,9 +134,7 @@ export class FileBackend extends LocalBackend {
 
     subscriber.queue
       .add(() => this.handleMessage(message, subscriber))
-      .catch((e) => {
-        this.logError(e)
-      })
+      .catch((e) => this.emit('error', e))
   }
 
   /**
@@ -218,19 +216,6 @@ export class FileBackend extends LocalBackend {
    */
   private getMessagePathFromId(messageId: string, queue: string): string {
     return resolve(this.getQueuePath(queue), messageId)
-  }
-
-  /**
-   * Logs an error with the logger, if provided
-   */
-  private logError(error: any) {
-    if (this.logger) {
-      if (error.message) {
-        this.logger.error(error.message, { error })
-      } else {
-        this.logger.error(error)
-      }
-    }
   }
 }
 
