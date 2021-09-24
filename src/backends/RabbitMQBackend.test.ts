@@ -220,10 +220,9 @@ describe('RabbitMQ Backend', () => {
   it('Should detect inability to connect', async () => {
     await rabbitMq.close()
     const dfd = new Deferred()
-    // A port that should be closed
-    const closedPort = '546'
 
-    rabbitMq = new RabbitMQBackend(url.replace(/\d+$/, closedPort))
+    // Nothing should be listening on port 50
+    rabbitMq = new RabbitMQBackend('amqp://localhost:50')
     rabbitMq.on('error', (err) => dfd.resolve(err))
 
     await expect(
