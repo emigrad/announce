@@ -19,7 +19,7 @@ export interface RabbitMQOptions {
  */
 export class RabbitMQBackend extends EventEmitter implements Backend {
   private readonly exchange: string
-  private readonly subscribers: Subscriber<any>[]
+  private readonly subscribers: Subscriber<Buffer>[]
   private readonly subscriberChannels: Record<number, PromiseLike<Channel>>
   private readonly rebuildPromises: Record<number, PromiseLike<any>>
   private connection: PromiseLike<Connection>
@@ -49,7 +49,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     )
   }
 
-  async publish(message: Message<any>): Promise<void> {
+  async publish(message: Message<Buffer>): Promise<void> {
     const publishChannel = await this.getPublishChannel()
     const { id: messageId, published, ...headers } = message.headers
     const timestamp = Math.floor(+new Date(published) / 1000)
@@ -58,7 +58,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
       publishChannel.publish(
         this.exchange,
         message.topic,
-        Buffer.from(JSON.stringify(message.body)),
+        message.body,
         { headers, timestamp, messageId, persistent: true },
         (err) => {
           if (err) {
@@ -71,7 +71,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     })
   }
 
-  async subscribe(subscriber: Subscriber<any>): Promise<void> {
+  async subscribe(subscriber: Subscriber<Buffer>): Promise<void> {
     this.subscribers.push(subscriber)
 
     await this.createQueue(subscriber)
@@ -162,7 +162,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     await channel.assertExchange(this.exchange, 'topic')
   }
 
-  private async createQueue(subscriber: Subscriber<any>): Promise<void> {
+  private async createQueue(subscriber: Subscriber<Buffer>): Promise<void> {
     const channel = await this.getChannelForSubscriber(subscriber)
     const options = getQueueOptions(subscriber)
 
@@ -180,7 +180,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     )
   }
 
-  private async consume(subscriber: Subscriber<any>): Promise<void> {
+  private async consume(subscriber: Subscriber<Buffer>): Promise<void> {
     const channel = await this.getChannelForSubscriber(subscriber)
 
     await channel.consume(subscriber.name, async (message) => {
@@ -214,7 +214,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
   }
 
   private async getChannelForSubscriber(
-    subscriber: Subscriber<any>
+    subscriber: Subscriber<Buffer>
   ): Promise<Channel> {
     return this.getChannelForConcurrency(getConcurrency(subscriber))
   }
@@ -244,18 +244,18 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
   }
 }
 
-function getQueueOptions(subscriber: Subscriber<any>): Options.AssertQueue {
+function getQueueOptions(subscriber: Subscriber<Buffer>): Options.AssertQueue {
   const options: Options.AssertQueue = { durable: true }
 
   if (hasDeadLetterQueue(subscriber)) {
     options.deadLetterExchange = ''
-    options.deadLetterRoutingKey = `-dlq-${subscriber.name}`
+    options.deadLetterRoutingKey = `~dlq-${subscriber.name}`
   }
 
   return options
 }
 
-function convertMessage(message: ConsumeMessage): Message<any> {
+function convertMessage(message: ConsumeMessage): Message<Buffer> {
   return {
     topic: message.fields.routingKey,
     headers: {
@@ -263,7 +263,7 @@ function convertMessage(message: ConsumeMessage): Message<any> {
       id: message.properties.messageId,
       published: new Date(message.properties.timestamp * 1000).toISOString()
     },
-    body: JSON.parse(message.content.toString())
+    body: message.content
   }
 }
 

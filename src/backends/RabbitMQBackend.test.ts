@@ -45,8 +45,8 @@ describe('RabbitMQ Backend', () => {
       published: '2020-01-02T18:19:20.000Z',
       header1: 'Test'
     }
-    const body = { hi: 'there' }
-    const subscriber: Subscriber<any> = {
+    const body = Buffer.from('hi there')
+    const subscriber: Subscriber<Buffer> = {
       name: queueName,
       topics: ['test.*'],
       async handle(message) {
@@ -66,21 +66,21 @@ describe('RabbitMQ Backend', () => {
     await channel.deleteQueue(queueName1)
     await channel.deleteQueue(queueName2)
 
-    const dfd1 = new Deferred()
-    const dfd2 = new Deferred()
+    const dfd1 = new Deferred<Buffer>()
+    const dfd2 = new Deferred<Buffer>()
     const headers: Headers = {
       id: cuid(),
       published: '2020-01-02T18:19:20.000Z',
       header1: 'Test'
     }
-    const subscriber1: Subscriber<any> = {
+    const subscriber1: Subscriber<Buffer> = {
       name: queueName1,
       topics: ['test.test1'],
       async handle({ body }) {
         dfd1.resolve(body)
       }
     }
-    const subscriber2: Subscriber<any> = {
+    const subscriber2: Subscriber<Buffer> = {
       name: queueName2,
       topics: ['test.test2'],
       async handle({ body }) {
@@ -91,11 +91,19 @@ describe('RabbitMQ Backend', () => {
     await rabbitMq.subscribe(subscriber1)
     await rabbitMq.subscribe(subscriber2)
 
-    await rabbitMq.publish({ body: { id: 1 }, headers, topic: 'test.test1' })
-    await rabbitMq.publish({ body: { id: 2 }, headers, topic: 'test.test2' })
+    await rabbitMq.publish({
+      body: Buffer.from('1'),
+      headers,
+      topic: 'test.test1'
+    })
+    await rabbitMq.publish({
+      body: Buffer.from('2'),
+      headers,
+      topic: 'test.test2'
+    })
 
-    expect(await dfd1.promise).toMatchObject({ id: 1 })
-    expect(await dfd2.promise).toMatchObject({ id: 2 })
+    expect((await dfd1.promise).toString()).toBe('1')
+    expect((await dfd2.promise).toString()).toBe('2')
   })
 
   it.each([false, true, undefined])(
@@ -106,7 +114,7 @@ describe('RabbitMQ Backend', () => {
         id: cuid(),
         published: new Date().toISOString()
       }
-      const subscriber: Subscriber<any> = {
+      const subscriber: Subscriber<Buffer> = {
         name: queueName,
         topics: [topic],
         options: { deadLetterQueue: enableDlq },
@@ -115,11 +123,11 @@ describe('RabbitMQ Backend', () => {
         }
       }
 
-      const dlq = `-dlq-${subscriber.name}`
+      const dlq = `~dlq-${subscriber.name}`
       await channel.deleteQueue(dlq)
 
       await rabbitMq.subscribe(subscriber)
-      await rabbitMq.publish({ body: { id: 1 }, headers, topic })
+      await rabbitMq.publish({ body: Buffer.from(''), headers, topic })
 
       if (enableDlq === true || enableDlq === undefined) {
         const dfd = new Deferred()
@@ -143,7 +151,7 @@ describe('RabbitMQ Backend', () => {
       published: '2020-01-02T18:19:20.000Z'
     }
     const receivedMessageTimes: number[] = []
-    const subscriber: Subscriber<any> = {
+    const subscriber: Subscriber<Buffer> = {
       name: queueName,
       topics: ['test.*'],
       options: { concurrency },
@@ -160,7 +168,7 @@ describe('RabbitMQ Backend', () => {
     await rabbitMq.subscribe(subscriber)
 
     for (let i = 0; i < numMessages; i++) {
-      await rabbitMq.publish({ body: null, headers, topic })
+      await rabbitMq.publish({ body: Buffer.from(''), headers, topic })
     }
 
     await dfd.promise
@@ -180,7 +188,7 @@ describe('RabbitMQ Backend', () => {
   it('publish() should still succeed even if there are no consumers', async () => {
     const topic = String(Math.random())
     const headers: Headers = { id: cuid(), published: new Date().toISOString() }
-    const body = null
+    const body = Buffer.from('')
 
     await rabbitMq.publish({ body, headers, topic })
   })
@@ -188,7 +196,7 @@ describe('RabbitMQ Backend', () => {
   it('Should handle publish errors', async () => {
     const topic = String(Math.random())
     const headers: Headers = { id: cuid(), published: new Date().toISOString() }
-    const body = null
+    const body = Buffer.from('')
 
     await rabbitMq.publish({ body, headers, topic })
 
@@ -202,7 +210,7 @@ describe('RabbitMQ Backend', () => {
 
   it('Should emit error if queue deleted', async () => {
     const dfd = new Deferred()
-    const subscriber: Subscriber<any> = {
+    const subscriber: Subscriber<Buffer> = {
       name: queueName,
       topics: ['test.*'],
       async handle(message) {
@@ -227,7 +235,7 @@ describe('RabbitMQ Backend', () => {
 
     await expect(
       rabbitMq.publish({
-        body: null,
+        body: Buffer.from(''),
         headers: { id: '1', published: new Date().toString() },
         topic: String(Math.random())
       })
@@ -241,7 +249,7 @@ describe('RabbitMQ Backend', () => {
 
     rabbitMq.on('error', (err) => dfd.resolve(err))
     await rabbitMq.publish({
-      body: null,
+      body: Buffer.from(''),
       headers: { id: '1', published: new Date().toString() },
       topic: String(Math.random())
     })

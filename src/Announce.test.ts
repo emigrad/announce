@@ -64,7 +64,7 @@ describe('Announce', () => {
     await announce.subscribe(subscriber)
     await announce.publish({
       topic: 'foo',
-      body: { hi: 'there' },
+      body: Buffer.from('hi there'),
       headers: getCompleteHeaders()
     })
 

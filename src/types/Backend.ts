@@ -1,3 +1,4 @@
+import * as Buffer from 'buffer'
 import { EventEmitter } from 'events'
 import { Message } from './Message'
 import { Subscriber } from './Subscriber'
@@ -6,12 +7,12 @@ export interface Backend extends Pick<EventEmitter, 'on'> {
   /**
    * Publishes a message to all interested subscribers
    */
-  publish(message: Message<any>): Promise<void>
+  publish(message: Message<Buffer>): Promise<void>
 
   /**
    * Adds the subscriber
    */
-  subscribe(subscriber: Subscriber<any>): Promise<void>
+  subscribe(subscriber: Subscriber<Buffer>): Promise<void>
 }
 
 export interface BackendConstructor {

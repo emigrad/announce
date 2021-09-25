@@ -1,11 +1,11 @@
 import { createHash } from 'crypto'
 import { tmpdir } from 'os'
 import { resolve } from 'path'
+import rimrafCb from 'rimraf'
 import { Deferred } from 'ts-deferred'
 import { promisify } from 'util'
-import { Message, Subscriber, SubscriberExtra } from '../types'
+import { Message, Subscriber } from '../types'
 import { FileBackend } from './FileBackend'
-import rimrafCb from 'rimraf'
 
 const rimraf = promisify(rimrafCb)
 
@@ -18,28 +18,24 @@ describe('File backend', () => {
   })
 
   it('Should publish and receive messages', async () => {
-    const dfd = new Deferred<[any, SubscriberExtra]>()
-    const subscriber: Subscriber<{}> = {
+    const dfd = new Deferred<Message<Buffer>>()
+    const subscriber: Subscriber<Buffer> = {
       name: 'test',
       topics: ['foo.bar'],
-      handle: (message, extra) => dfd.resolve([message, extra])
+      handle: (message) => dfd.resolve(message)
     }
-    const message: Message<{}> = {
+    const message: Message<Buffer> = {
       headers: { id: 'abcd', published: new Date().toISOString() },
       topic: 'foo.bar',
-      body: { hello: 'world' }
+      body: Buffer.from('hi there')
     }
 
     const fileBackend = new FileBackend(path)
     await fileBackend.subscribe(subscriber)
     await fileBackend.publish(message)
 
-    const [receivedBody, extra] = await dfd.promise
-    expect(receivedBody).toBe(message.body)
-    expect(extra).toMatchObject({
-      headers: message.headers,
-      topic: message.topic
-    })
+    const receivedMessage = await dfd.promise
+    expect(receivedMessage).toMatchObject(message)
   })
 
   it.each([
@@ -65,14 +61,14 @@ describe('File backend', () => {
         topics: [selector],
         handle: () => (receivedMessage = true)
       }
-      const message: Message<{}> = {
+      const message: Message<Buffer> = {
         headers: { id: 'abcd', published: new Date().toISOString() },
         topic,
-        body: { hello: 'world' }
+        body: Buffer.from('hi there')
       }
 
       const fileBackend = new FileBackend(path)
-      fileBackend.subscribe(subscriber)
+      await fileBackend.subscribe(subscriber)
       await fileBackend.publish(message)
 
       expect(receivedMessage).toBe(expected)
@@ -92,17 +88,17 @@ describe('File backend', () => {
     ]
     const done = Promise.all(dfds.map(({ promise }) => promise))
 
-    const subscriber: Subscriber<{ seq: number }> = {
+    const subscriber: Subscriber<Buffer> = {
       name: 'test',
       topics: ['foo'],
-      handle: async (body) => {
+      handle: async ({ body }) => {
         expect(numRunning).toBeLessThan(subscriber.options?.concurrency!)
         numRunning++
         maxRunning = Math.max(maxRunning, numRunning)
 
         await new Promise((resolve) => setTimeout(resolve, 100))
         numRunning--
-        dfds[body.seq].resolve()
+        dfds[+body.toString()].resolve()
       },
       options: { concurrency: 2 }
     }
@@ -113,7 +109,9 @@ describe('File backend', () => {
     const fileBackend = new FileBackend(path)
     fileBackend.subscribe(subscriber)
 
-    dfds.forEach((_, seq) => fileBackend.publish({ ...message, body: { seq } }))
+    dfds.forEach((_, seq) =>
+      fileBackend.publish({ ...message, body: Buffer.from(String(seq)) })
+    )
     await done
 
     expect(maxRunning).toBe(subscriber.options?.concurrency)
@@ -131,10 +129,10 @@ describe('File backend', () => {
       topics: ['foo.bar'],
       handle: () => dfd.resolve()
     }
-    const message: Message<{}> = {
+    const message: Message<Buffer> = {
       headers: { id: 'abcd', published: new Date().toISOString() },
       topic: 'foo.bar',
-      body: { hello: 'world' }
+      body: Buffer.from('hi there')
     }
 
     const fileBackend1 = new FileBackend(path)
@@ -150,7 +148,7 @@ describe('File backend', () => {
   it('Should not redeliver messages that were successfully processed', async () => {
     const dfd = new Deferred()
     let handleCount = 0
-    const subscriber: Subscriber<{}> = {
+    const subscriber: Subscriber<Buffer> = {
       name: 'test',
       topics: ['foo.bar'],
       handle: () => {
@@ -158,10 +156,10 @@ describe('File backend', () => {
         dfd.resolve()
       }
     }
-    const message: Message<{}> = {
+    const message: Message<Buffer> = {
       headers: { id: 'abcd', published: new Date().toISOString() },
       topic: 'foo.bar',
-      body: { hello: 'world' }
+      body: Buffer.from('hi there')
     }
 
     const fileBackend1 = new FileBackend(path)
@@ -188,15 +186,15 @@ describe('File backend', () => {
           return Promise.reject()
         }
       }
-      const dlqSubscriber: Subscriber<{}> = {
+      const dlqSubscriber: Subscriber<Buffer> = {
         name: 'test.dlq',
         topics: [],
         handle: () => dlqSubscriberDfd.resolve()
       }
-      const message: Message<{}> = {
+      const message: Message<Buffer> = {
         headers: { id: 'abcd', published: new Date().toISOString() },
         topic: 'foo.bar',
-        body: { hello: 'world' }
+        body: Buffer.from('hi there')
       }
 
       const fileBackend = new FileBackend(path)

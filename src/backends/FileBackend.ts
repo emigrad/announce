@@ -46,12 +46,12 @@ export class FileBackend extends LocalBackend {
     this.queuePath = resolve(path, 'queues')
   }
 
-  async subscribe(subscriber: Subscriber<any>): Promise<void> {
+  async subscribe(subscriber: Subscriber<Buffer>): Promise<void> {
     await super.subscribe(subscriber)
     await this.queuePersistedMessages(subscriber)
   }
 
-  async publish(message: Message<any>): Promise<void> {
+  async publish(message: Message<Buffer>): Promise<void> {
     await Promise.all(
       this.getMatchingSubscribers(message).map(async (subscriber) => {
         await this.enqueue(message, subscriber.name)
@@ -63,7 +63,7 @@ export class FileBackend extends LocalBackend {
    * Loads all of the persisted messages into the in-memory queue
    */
   private async queuePersistedMessages(
-    subscriber: Subscriber<any>
+    subscriber: Subscriber<Buffer>
   ): Promise<void> {
     const persistedMessages = await this.loadPersistedMessages(subscriber)
 
@@ -77,8 +77,8 @@ export class FileBackend extends LocalBackend {
    * subscriber
    */
   private async loadPersistedMessages(
-    subscriber: Subscriber<any>
-  ): Promise<Message<any>[]> {
+    subscriber: Subscriber<Buffer>
+  ): Promise<Message<Buffer>[]> {
     const messageIds = await this.getPersistedMessageIds(subscriber)
 
     return Promise.all(
@@ -91,7 +91,7 @@ export class FileBackend extends LocalBackend {
    * given queue. The message IDs will be returned oldest first
    */
   private async getPersistedMessageIds(
-    subscriber: Subscriber<any>
+    subscriber: Subscriber<Buffer>
   ): Promise<string[]> {
     try {
       return (await readdir(this.getQueuePath(subscriber.name))).sort()
@@ -108,19 +108,23 @@ export class FileBackend extends LocalBackend {
    * Loads a persisted message from disk
    */
   private async loadPersistedMessage(
-    subscriber: Subscriber<any>,
+    subscriber: Subscriber<Buffer>,
     id: string
-  ): Promise<Message<any>> {
+  ): Promise<Message<Buffer>> {
     const path = this.getMessagePathFromId(id, subscriber.name)
     const rawMessage = await readFile(path, 'utf8')
 
-    return JSON.parse(rawMessage)
+    const parsedMessage = JSON.parse(rawMessage) as Message<string>
+    return { ...parsedMessage, body: Buffer.from(parsedMessage.body, 'base64') }
   }
 
   /**
    * Adds the message to both the persisted and in-memory queues
    */
-  private async enqueue(message: Message<any>, queue: string): Promise<void> {
+  private async enqueue(
+    message: Message<Buffer>,
+    queue: string
+  ): Promise<void> {
     message = addMetadata(message)
 
     await this.addToPersistedQueue(message, queue)
@@ -130,7 +134,7 @@ export class FileBackend extends LocalBackend {
   /**
    * Adds the message to the in-memory queue
    */
-  private addToInMemoryQueue(message: Message<any>, queue: string) {
+  private addToInMemoryQueue(message: Message<Buffer>, queue: string) {
     const subscriber = this.getSubscriberForQueue(queue)
     if (!subscriber) {
       return
@@ -154,14 +158,14 @@ export class FileBackend extends LocalBackend {
    * Adds the message to the queue on disk
    */
   private async addToPersistedQueue(
-    message: Message<any>,
+    message: Message<Buffer>,
     queue: string
   ): Promise<void> {
     await this.createQueuePath(queue)
 
     return writeFile(
       this.getMessagePath(message, queue),
-      JSON.stringify(message)
+      JSON.stringify({ ...message, body: message.body.toString('base64') })
     )
   }
 
@@ -169,11 +173,11 @@ export class FileBackend extends LocalBackend {
    * Gets the subscriber to handle the message
    */
   private async handleMessage(
-    message: Message<any>,
+    message: Message<Buffer>,
     subscriber: SubscriberWithQueue
   ) {
     try {
-      await subscriber.handle((message as Message<any>).body, message)
+      await subscriber.handle(message)
     } catch (e) {
       if (hasDeadLetterQueue(subscriber)) {
         await this.enqueue(message, getDeadLetterQueue(subscriber)!)
@@ -187,7 +191,7 @@ export class FileBackend extends LocalBackend {
    * Removes the message from the given queue on dist
    */
   private removeFromPersistedQueue(
-    message: Message<any>,
+    message: Message<Buffer>,
     queue: string
   ): Promise<void> {
     return unlink(this.getMessagePath(message, queue))
@@ -211,7 +215,7 @@ export class FileBackend extends LocalBackend {
   /**
    * Returns the path of the message in the given queue
    */
-  private getMessagePath(message: Message<any>, queue: string): string {
+  private getMessagePath(message: Message<Buffer>, queue: string): string {
     return this.getMessagePathFromId(message.headers[fileIdHeader], queue)
   }
 
@@ -226,7 +230,7 @@ export class FileBackend extends LocalBackend {
 /**
  * Adds our metadata to the message
  */
-function addMetadata(message: Message<any>): Message<any> {
+function addMetadata(message: Message<Buffer>): Message<Buffer> {
   return {
     ...message,
     headers: { ...message.headers, [fileIdHeader]: cuid() }

@@ -25,13 +25,11 @@ export class InMemoryBackend extends LocalBackend {
   /**
    * Publishes the message to all interested subscribers
    */
-  publish(message: Message<any>) {
+  async publish(message: Message<Buffer>) {
     this.getMatchingSubscribers(message).forEach((subscriber) =>
       subscriber.queue.add(async () => {
         try {
-          await subscriber.handle((message as Message<any>).body, {
-            ...message
-          })
+          await subscriber.handle(message)
         } catch (e) {
           // Squelch - use middleware to process errors
         }

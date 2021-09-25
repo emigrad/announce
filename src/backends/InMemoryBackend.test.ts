@@ -1,31 +1,27 @@
 import { Deferred } from 'ts-deferred'
-import { Message, Subscriber, SubscriberExtra } from '../types'
+import { getConcurrency } from '../selectors'
+import { Message, Subscriber } from '../types'
 import { InMemoryBackend } from './InMemoryBackend'
 
 describe('In memory backend', () => {
   it('Should publish and receive messages', async () => {
-    const dfd = new Deferred<[any, SubscriberExtra]>()
-    const subscriber: Subscriber<{}> = {
+    const dfd = new Deferred<Message<Buffer>>()
+    const subscriber: Subscriber<Buffer> = {
       name: 'test',
       topics: ['foo.bar'],
-      handle: (message, extra) => dfd.resolve([message, extra])
+      handle: (message) => dfd.resolve(message)
     }
-    const message: Message<{}> = {
+    const message: Message<Buffer> = {
       headers: { id: 'abcd', published: new Date().toISOString() },
       topic: 'foo.bar',
-      body: { hello: 'world' }
+      body: Buffer.from('hi there')
     }
 
     const inMemory = new InMemoryBackend()
     inMemory.subscribe(subscriber)
     await inMemory.publish(message)
 
-    const [receivedBody, extra] = await dfd.promise
-    expect(receivedBody).toBe(message.body)
-    expect(extra).toMatchObject({
-      headers: message.headers,
-      topic: message.topic
-    })
+    expect(await dfd.promise).toMatchObject(message)
   })
 
   it.each([
@@ -46,15 +42,15 @@ describe('In memory backend', () => {
     'Should support wildcards in topic selectors (selector: %p, topic: %p)',
     async (selector, topic, expected) => {
       let receivedMessage = false
-      const subscriber: Subscriber<{}> = {
+      const subscriber: Subscriber<Buffer> = {
         name: 'test',
         topics: [selector],
         handle: () => (receivedMessage = true)
       }
-      const message: Message<{}> = {
+      const message: Message<Buffer> = {
         headers: { id: 'abcd', published: new Date().toISOString() },
         topic,
-        body: { hello: 'world' }
+        body: Buffer.from('hi there')
       }
 
       const inMemory = new InMemoryBackend()
@@ -78,28 +74,30 @@ describe('In memory backend', () => {
     ]
     const done = Promise.all(dfds.map(({ promise }) => promise))
 
-    const subscriber: Subscriber<{ seq: number }> = {
+    const subscriber: Subscriber<Buffer> = {
       name: 'test',
       topics: ['foo'],
-      handle: async (body) => {
-        expect(numRunning).toBeLessThan(subscriber.options?.concurrency!)
+      handle: async ({ body }) => {
+        expect(numRunning).toBeLessThan(getConcurrency(subscriber))
         numRunning++
         maxRunning = Math.max(maxRunning, numRunning)
 
         await new Promise((resolve) => setTimeout(resolve, 100))
         numRunning--
-        dfds[body.seq].resolve()
+        dfds[+body.toString()].resolve()
       },
       options: { concurrency: 2 }
     }
-    const message: Omit<Message<{}>, 'body'> = {
+    const message: Omit<Message<Buffer>, 'body'> = {
       headers: { id: 'abcd', published: new Date().toISOString() },
       topic: 'foo'
     }
     const inMemory = new InMemoryBackend()
     inMemory.subscribe(subscriber)
 
-    dfds.forEach((_, seq) => inMemory.publish({ ...message, body: { seq } }))
+    dfds.forEach((_, seq) =>
+      inMemory.publish({ ...message, body: Buffer.from(String(seq)) })
+    )
     await done
 
     expect(maxRunning).toBe(subscriber.options?.concurrency)

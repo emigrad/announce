@@ -95,11 +95,12 @@ export class Announce {
       const middleware = middlewares[middlewareNum]
 
       if (!middleware) {
-        if (isValidTopic(message.topic)) {
-          return backend.publish(message)
-        } else {
-          return Promise.reject(new Error(`Invalid topic: ${message.topic}`))
+        try {
+          validateMessage(message)
+        } catch (e) {
+          return Promise.reject(e)
         }
+        return backend.publish(message)
       } else if (middleware.publish) {
         return middleware.publish({
           message,
@@ -130,5 +131,13 @@ function validateSubscriber(subscriber: Subscriber<any>) {
   )
   if (invalidTopics.length) {
     throw new Error(`Invalid topic selector(s): ${invalidTopics.join(', ')}`)
+  }
+}
+
+function validateMessage(message: Message<any>) {
+  if (!isValidTopic(message.topic)) {
+    throw new Error(`Invalid topic: ${message.topic}`)
+  } else if (!(message.body instanceof Buffer)) {
+    throw new Error('Message body must be a Buffer')
   }
 }
