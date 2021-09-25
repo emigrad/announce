@@ -13,6 +13,11 @@ export interface Backend extends Pick<EventEmitter, 'on'> {
    * Adds the subscriber
    */
   subscribe(subscriber: Subscriber<Buffer>): Promise<void>
+
+  /**
+   * Closes the connection
+   */
+  close(): Promise<void>
 }
 
 export interface BackendConstructor {

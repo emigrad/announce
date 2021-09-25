@@ -115,4 +115,25 @@ describe('Announce', () => {
     expect(() => new Announce(backendUrl, { backendFactory })).toThrow(Error)
     expect(backendFactory.getBackend).toHaveBeenCalledWith(backendUrl)
   })
+
+  it('Should close the backend when the backend encounters an error', async () => {
+    const error = new Error()
+    const dfd = new Deferred()
+    const backend = new InMemoryBackend()
+    const backendFactory = {
+      getBackend: jest.fn().mockReturnValue(backend)
+    }
+    // Simulate a rejection of the close promise, to ensure we correctly
+    // handle it
+    backend.close = jest.fn().mockRejectedValue(undefined)
+
+    const announce = new Announce('memory://', { backendFactory })
+    announce.on('error', dfd.resolve)
+
+    // Report a unrecoverable error
+    backend.emit('error', error)
+
+    expect(await dfd.promise).toBe(error)
+    expect(backend.close).toHaveBeenCalled()
+  })
 })

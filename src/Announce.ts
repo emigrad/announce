@@ -1,4 +1,5 @@
 import cuid from 'cuid'
+import { EventEmitter } from 'events'
 import { BackendFactory } from './backends/BackendFactory'
 import {
   Backend,
@@ -13,14 +14,17 @@ export interface AnnounceOptions {
   backendFactory?: Pick<BackendFactory, 'getBackend'>
 }
 
-export class Announce {
+export class Announce extends EventEmitter {
   private readonly backend: Backend
   private readonly middlewares: Middleware[]
+  private closePromise: Promise<void> | undefined
 
   constructor(
     private readonly url: string = process.env.ANNOUNCE_BACKEND_URL!,
     private readonly options: AnnounceOptions = {}
   ) {
+    super()
+
     const { backendFactory = new BackendFactory() } = options
     const backend = backendFactory.getBackend(url ?? '')
 
@@ -33,6 +37,7 @@ export class Announce {
     }
 
     this.backend = backend
+    this.backend.on('error', this.destroy.bind(this))
     this.middlewares = []
   }
 
@@ -127,6 +132,21 @@ export class Announce {
         return next(message, middlewareNum + 1)
       }
     }
+  }
+
+  async close() {
+    if (!this.closePromise) {
+      this.closePromise = this.backend.close()
+    }
+
+    return this.closePromise
+  }
+
+  destroy(err: any) {
+    this.emit('error', err)
+    this.close().catch(() => {
+      // We don't care about any errors when trying to shut down
+    })
   }
 }
 

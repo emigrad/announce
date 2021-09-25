@@ -22,6 +22,8 @@ export abstract class LocalBackend extends EventEmitter implements Backend {
     })
   }
 
+  async close(): Promise<void> {}
+
   /**
    * Returns the subscribers that are interested in the message
    */

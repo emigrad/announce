@@ -12,9 +12,15 @@ const rimraf = promisify(rimrafCb)
 describe('File backend', () => {
   const hash = createHash('md5').update(__filename).digest('hex').toString()
   const path = resolve(tmpdir(), hash)
+  let fileBackend: FileBackend
 
   beforeEach(async () => {
     await rimraf(path)
+    fileBackend = new FileBackend(path)
+  })
+
+  afterEach(async () => {
+    await fileBackend.close()
   })
 
   it('Should publish and receive messages', async () => {
@@ -30,7 +36,6 @@ describe('File backend', () => {
       body: Buffer.from('hi there')
     }
 
-    const fileBackend = new FileBackend(path)
     await fileBackend.subscribe(subscriber)
     await fileBackend.publish(message)
 
@@ -67,7 +72,6 @@ describe('File backend', () => {
         body: Buffer.from('hi there')
       }
 
-      const fileBackend = new FileBackend(path)
       await fileBackend.subscribe(subscriber)
       await fileBackend.publish(message)
 
@@ -106,8 +110,7 @@ describe('File backend', () => {
       headers: { id: 'abcd', published: new Date().toISOString() },
       topic: 'foo'
     }
-    const fileBackend = new FileBackend(path)
-    fileBackend.subscribe(subscriber)
+    await fileBackend.subscribe(subscriber)
 
     dfds.forEach((_, seq) =>
       fileBackend.publish({ ...message, body: Buffer.from(String(seq)) })
@@ -143,6 +146,7 @@ describe('File backend', () => {
     await fileBackend2.subscribe(subscriber2)
 
     await dfd.promise
+    await Promise.all([fileBackend1.close(), fileBackend2.close()])
   })
 
   it('Should not redeliver messages that were successfully processed', async () => {
@@ -171,6 +175,7 @@ describe('File backend', () => {
     await fileBackend2.subscribe(subscriber)
 
     expect(handleCount).toBe(1)
+    await Promise.all([fileBackend1.close(), fileBackend2.close()])
   })
 
   it.each([false, true])(
@@ -197,7 +202,6 @@ describe('File backend', () => {
         body: Buffer.from('hi there')
       }
 
-      const fileBackend = new FileBackend(path)
       await fileBackend.subscribe(subscriber)
 
       if (currentlySubscribed) {
