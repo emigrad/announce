@@ -13,7 +13,7 @@ export interface Headers {
   [key: string]: string
 }
 
-export interface Message<Body extends {} | undefined> {
+export interface Message<Body extends any> {
   /** The topic of the message. Must be a dotted string */
   topic: string
   /** Metadata about the message */

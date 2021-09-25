@@ -2,8 +2,8 @@ import { Deferred } from 'ts-deferred'
 import { Announce } from './Announce'
 import { InMemoryBackend } from './backends'
 import { getCompleteHeaders } from './message'
-import { errorLoggerMiddleware, loggerMiddleware } from './middleware'
-import { LeveledLogMethod, Logger, Subscriber } from './types'
+import { Logger, LoggerMiddleware } from './middleware'
+import { Subscriber } from './types'
 
 describe('Announce', () => {
   beforeEach(() => {
@@ -13,12 +13,12 @@ describe('Announce', () => {
   it.each(['***', ' hello', '..foo', '.bar', 'bar.', 'something-else'])(
     'Should reject subscribers that listen to invalid topic %p',
     (topic) => {
-      const subscriber: Subscriber<any, any> = {
+      const subscriber: Subscriber<any> = {
         name: 'test',
         topics: [topic],
         handle: jest.fn()
       }
-      const announce = new Announce('memory://', [])
+      const announce = new Announce('memory://')
 
       expect(() => announce.subscribe(subscriber)).toThrow()
     }
@@ -26,21 +26,21 @@ describe('Announce', () => {
 
   it.each(['***', ' hello', '..foo', '.bar', 'bar.', 'something-else'])(
     'Should reject attempts to send messages to invalid topic %p',
-    (topic) => {
+    async (topic) => {
       const backend = new InMemoryBackend()
       backend.publish = jest.fn()
 
-      const announce = new Announce('test://', [], {
+      const announce = new Announce('test://', {
         backendFactory: { getBackend: () => backend }
       })
 
-      expect(() =>
+      await expect(
         announce.publish({
           body: { hi: 'there' },
           headers: getCompleteHeaders(),
           topic
         })
-      ).toThrow()
+      ).rejects.toBeDefined()
       expect(backend.publish).not.toHaveBeenCalled()
     }
   )
@@ -48,22 +48,18 @@ describe('Announce', () => {
   it('Should pass subscriptions onto the backend, after applying middleware', async () => {
     const dfd = new Deferred<[string, Error]>()
     const error = new Error('no')
-    const subscriber: Subscriber<any, any> = {
+    const subscriber: Subscriber<any> = {
       name: 'test',
       topics: ['foo'],
       handle: jest.fn().mockRejectedValue(error)
     }
     const logger = {
-      error: function (message, err) {
-        dfd.resolve([message, err])
-        return this
-      },
-      debug: jest.fn() as LeveledLogMethod
+      error: () => dfd.resolve(),
+      info: jest.fn(),
+      trace: jest.fn()
     } as Logger
-    const announce = new Announce('memory://', [
-      loggerMiddleware(logger),
-      errorLoggerMiddleware()
-    ])
+    const announce = new Announce('memory://')
+    announce.use(new LoggerMiddleware(logger))
 
     await announce.subscribe(subscriber)
     await announce.publish({
@@ -72,7 +68,7 @@ describe('Announce', () => {
       headers: getCompleteHeaders()
     })
 
-    expect(await dfd.promise).toEqual(['Error processing message', { error }])
+    await dfd.promise
   })
 
   it('Should throw an error if the URL is not defined', () => {
@@ -87,7 +83,7 @@ describe('Announce', () => {
       getBackend: jest.fn().mockReturnValue(new InMemoryBackend())
     }
 
-    new Announce(undefined, [], { backendFactory })
+    new Announce(undefined, { backendFactory })
     expect(backendFactory.getBackend).toHaveBeenCalledWith(backendUrl)
   })
 
@@ -95,9 +91,7 @@ describe('Announce', () => {
     const backendUrl = 'blah://'
     const backendFactory = { getBackend: jest.fn() }
 
-    expect(() => new Announce(backendUrl, [], { backendFactory })).toThrow(
-      Error
-    )
+    expect(() => new Announce(backendUrl, { backendFactory })).toThrow(Error)
     expect(backendFactory.getBackend).toHaveBeenCalledWith(backendUrl)
   })
 })

@@ -1,5 +1,5 @@
 import { Subscriber } from '../types'
-import { getDeadLetterQueue, hasDeadLetterQueue } from './index'
+import { getConcurrency, getDeadLetterQueue, hasDeadLetterQueue } from './index'
 
 describe('Selectors', () => {
   it.each([
@@ -29,4 +29,12 @@ describe('Selectors', () => {
       expect(getDeadLetterQueue(subscriber)).toBe(expected)
     }
   )
+
+  it.each([
+    [undefined, 1],
+    [{}, 1],
+    [{ concurrency: 4 }, 4]
+  ])('Should determine the concurrency (%p)', (options, expected) => {
+    expect(getConcurrency({ options } as Subscriber<any>)).toBe(expected)
+  })
 })

@@ -1,7 +1,8 @@
 import { Channel, ConfirmChannel, connect, Connection } from 'amqplib'
 import { ConsumeMessage, Options } from 'amqplib/properties'
 import { EventEmitter } from 'events'
-import { Backend, Message, Subscriber, SubscriberExtra } from '../types'
+import { getConcurrency, hasDeadLetterQueue } from '../selectors'
+import { Backend, Message, Subscriber } from '../types'
 
 export interface RabbitMQOptions {
   exchange?: string
@@ -70,7 +71,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     })
   }
 
-  async subscribe(subscriber: Subscriber<any, any>): Promise<void> {
+  async subscribe(subscriber: Subscriber<any>): Promise<void> {
     this.subscribers.push(subscriber)
 
     await this.createQueue(subscriber)
@@ -192,7 +193,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
         let ack: boolean
 
         try {
-          await subscriber.handle(getBody(message), getExtra(message))
+          await subscriber.handle(convertMessage(message))
           ack = true
         } catch (e) {
           ack = false
@@ -243,14 +244,10 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
   }
 }
 
-function getConcurrency(subscriber: Subscriber<any>): number {
-  return subscriber.options?.concurrency ?? 1
-}
-
 function getQueueOptions(subscriber: Subscriber<any>): Options.AssertQueue {
   const options: Options.AssertQueue = { durable: true }
 
-  if (subscriber.options?.deadLetterQueue ?? true) {
+  if (hasDeadLetterQueue(subscriber)) {
     options.deadLetterExchange = ''
     options.deadLetterRoutingKey = `-dlq-${subscriber.name}`
   }
@@ -258,18 +255,15 @@ function getQueueOptions(subscriber: Subscriber<any>): Options.AssertQueue {
   return options
 }
 
-function getBody(message: ConsumeMessage): Object {
-  return JSON.parse(message.content.toString('utf-8'))
-}
-
-function getExtra(message: ConsumeMessage): SubscriberExtra {
+function convertMessage(message: ConsumeMessage): Message<any> {
   return {
     topic: message.fields.routingKey,
     headers: {
       ...(message.properties.headers as Record<string, string>),
       id: message.properties.messageId,
       published: new Date(message.properties.timestamp * 1000).toISOString()
-    }
+    },
+    body: JSON.parse(message.content.toString())
   }
 }
 

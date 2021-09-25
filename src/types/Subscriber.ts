@@ -1,10 +1,7 @@
-import { Headers } from './message'
+import { Message } from './Message'
 
-export interface Handler<
-  Body extends {} | undefined,
-  Extra extends { topic: string; headers: Headers }
-> {
-  (body: Body, extra: Extra): any | Promise<any>
+export interface Handler<Body extends any> {
+  (message: Message<Body>): any | Promise<any>
 }
 
 export interface SubscriberOptions {
@@ -20,17 +17,7 @@ export interface SubscriberOptions {
   deadLetterQueue?: boolean
 }
 
-export interface SubscriberExtra {
-  /** The topic of the message */
-  topic: string
-  /** The message headers */
-  headers: Headers
-}
-
-export interface Subscriber<
-  Body extends {} | undefined,
-  Extra extends SubscriberExtra = SubscriberExtra
-> {
+export interface Subscriber<Body extends any> {
   /** The name of the subscriber. Must be a globally unique dotted string */
   name: string
 
@@ -48,7 +35,7 @@ export interface Subscriber<
   /**
    * The function to handle received messages
    */
-  handle: Handler<Body, SubscriberExtra & Extra>
+  handle: Handler<Body>
 
   /**
    * Any extra options

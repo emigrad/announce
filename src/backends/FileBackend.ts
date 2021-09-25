@@ -46,7 +46,7 @@ export class FileBackend extends LocalBackend {
     this.queuePath = resolve(path, 'queues')
   }
 
-  async subscribe(subscriber: Subscriber<any, any>): Promise<void> {
+  async subscribe(subscriber: Subscriber<any>): Promise<void> {
     await super.subscribe(subscriber)
     await this.queuePersistedMessages(subscriber)
   }

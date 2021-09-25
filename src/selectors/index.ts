@@ -1,5 +1,9 @@
 import { Subscriber } from '../types'
 
+export function getConcurrency(subscriber: Subscriber<any>): number {
+  return subscriber.options?.concurrency ?? 1
+}
+
 /**
  * Returns true if the subscriber has a dead letter queue
  */

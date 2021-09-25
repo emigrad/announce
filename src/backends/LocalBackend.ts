@@ -1,8 +1,9 @@
 import { EventEmitter } from 'events'
 import PromiseQueue from 'promise-queue'
+import { getConcurrency } from '../selectors'
 import { Backend, Message, Subscriber } from '../types'
 
-export interface SubscriberWithQueue extends Subscriber<any, any> {
+export interface SubscriberWithQueue extends Subscriber<any> {
   queue: PromiseQueue
 }
 
@@ -14,10 +15,10 @@ export abstract class LocalBackend extends EventEmitter implements Backend {
   /**
    * Registers a subscriber
    */
-  async subscribe(subscriber: Subscriber<any, any>): Promise<void> {
+  async subscribe(subscriber: Subscriber<any>): Promise<void> {
     this.subscribers.push({
       ...subscriber,
-      queue: new PromiseQueue(subscriber.options?.concurrency ?? 1)
+      queue: new PromiseQueue(getConcurrency(subscriber))
     })
   }
 
@@ -31,9 +32,7 @@ export abstract class LocalBackend extends EventEmitter implements Backend {
   }
 }
 
-function subscribesTo(
-  topic: string
-): (subscriber: Subscriber<any, any>) => boolean {
+function subscribesTo(topic: string): (subscriber: Subscriber<any>) => boolean {
   return (subscriber) =>
     subscriber.topics.some((topicSelector) =>
       getTopicSelectorRegExp(topicSelector).test(topic)

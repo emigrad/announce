@@ -37,7 +37,6 @@
     "@types/amqplib": "^0.8.2",
     "@types/dotenv-flow": "^3.2.0",
     "@types/jest": "^26.0.23",
-    "@types/pino": "^6.3.11",
     "@types/promise-queue": "^2.2.0",
     "@types/rimraf": "^3.0.0",
     "babel-jest": "^27.0.2",

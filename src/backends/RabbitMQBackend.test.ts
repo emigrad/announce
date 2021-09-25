@@ -49,15 +49,15 @@ describe('RabbitMQ Backend', () => {
     const subscriber: Subscriber<any> = {
       name: queueName,
       topics: ['test.*'],
-      async handle(receivedBody, extra) {
-        dfd.resolve({ body: receivedBody, extra })
+      async handle(message) {
+        dfd.resolve(message)
       }
     }
 
     await rabbitMq.subscribe(subscriber)
     await rabbitMq.publish({ body, headers, topic })
 
-    expect(await dfd.promise).toMatchObject({ body, extra: { headers } })
+    expect(await dfd.promise).toMatchObject({ body, headers })
   })
 
   it('Should only process relevant messages', async () => {
@@ -76,15 +76,15 @@ describe('RabbitMQ Backend', () => {
     const subscriber1: Subscriber<any> = {
       name: queueName1,
       topics: ['test.test1'],
-      async handle(receivedBody) {
-        dfd1.resolve(receivedBody)
+      async handle({ body }) {
+        dfd1.resolve(body)
       }
     }
     const subscriber2: Subscriber<any> = {
       name: queueName2,
       topics: ['test.test2'],
-      async handle(receivedBody) {
-        dfd2.resolve(receivedBody)
+      async handle({ body }) {
+        dfd2.resolve(body)
       }
     }
 
@@ -205,8 +205,8 @@ describe('RabbitMQ Backend', () => {
     const subscriber: Subscriber<any> = {
       name: queueName,
       topics: ['test.*'],
-      async handle(receivedBody, extra) {
-        dfd.resolve({ body: receivedBody, extra })
+      async handle(message) {
+        dfd.resolve(message)
       }
     }
 

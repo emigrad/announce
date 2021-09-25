@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events'
-import { Message } from './message'
-import { Subscriber } from './subscriber'
+import { Message } from './Message'
+import { Subscriber } from './Subscriber'
 
 export interface Backend extends Pick<EventEmitter, 'on'> {
   /**
@@ -11,7 +11,7 @@ export interface Backend extends Pick<EventEmitter, 'on'> {
   /**
    * Adds the subscriber
    */
-  subscribe(subscriber: Subscriber<any, any>): Promise<void>
+  subscribe(subscriber: Subscriber<any>): Promise<void>
 }
 
 export interface BackendConstructor {

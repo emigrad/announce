@@ -1,5 +1,4 @@
 import { BackendFactory } from './backends/BackendFactory'
-import { applyMiddlewares } from './middleware'
 import { Backend, Message, Middleware, Subscriber } from './types'
 
 export interface AnnounceOptions {
@@ -8,10 +7,10 @@ export interface AnnounceOptions {
 
 export class Announce {
   private readonly backend: Backend
+  private readonly middlewares: Middleware[]
 
   constructor(
     private readonly url: string = process.env.ANNOUNCE_BACKEND_URL!,
-    private readonly middlewares: Middleware<any, any>[] = [],
     private readonly options: AnnounceOptions = {}
   ) {
     const { backendFactory = new BackendFactory() } = options
@@ -26,25 +25,91 @@ export class Announce {
     }
 
     this.backend = backend
+    this.middlewares = []
   }
 
-  publish(message: Message<any>) {
-    if (!isValidTopic(message.topic)) {
-      throw new Error(`Invalid topic: ${message.topic}`)
-    }
+  /**
+   * Adds the middleware to the chain. When processing a message or
+   * subscriber, the middlewares are called in the order that they're added
+   */
+  use(middleware: Middleware) {
+    this.middlewares.push(middleware)
 
-    return this.backend.publish(message)
+    return this
   }
 
-  subscribe(subscriber: Subscriber<any, any>) {
-    const invalidTopics = subscriber.topics.filter(
-      (topic) => !isValidTopicSelector(topic)
-    )
-    if (invalidTopics.length) {
-      throw new Error(`Invalid topic selector(s): ${invalidTopics.join(', ')}`)
-    }
+  subscribe: (...args: [...Middleware[], Subscriber<any>]) => Promise<void> = (
+    ...args
+  ) => {
+    const backend = this.backend
+    const announce = this
+    const originalSubscriber = args[args.length - 1] as Subscriber<any>
+    const middlewares = [
+      ...this.middlewares,
+      ...(args.slice(0, -1) as Middleware[])
+    ]
 
-    this.backend.subscribe(applyMiddlewares(...this.middlewares)(subscriber))
+    return next({ ...originalSubscriber }, 0)
+
+    function next(
+      subscriber: Subscriber<any>,
+      middlewareNum: number
+    ): Promise<void> {
+      if (middlewareNum >= middlewares.length) {
+        validateSubscriber(subscriber)
+        return backend.subscribe(subscriber)
+      }
+
+      const middleware = middlewares[middlewareNum]
+      if (middleware.handle) {
+        const originalHandle = subscriber.handle.bind(subscriber)
+        subscriber.handle = (message) => {
+          return middleware.handle!({
+            message,
+            next: originalHandle,
+            subscriber,
+            announce
+          })
+        }
+      }
+
+      if (middleware.subscribe) {
+        return middleware.subscribe({
+          subscriber,
+          next: (newSubscriber) => next(newSubscriber, middlewareNum + 1),
+          announce
+        })
+      } else {
+        return next(subscriber, middlewareNum + 1)
+      }
+    }
+  }
+
+  publish(message: Message<any>): Promise<void> {
+    const { middlewares, backend } = this
+    const announce = this
+
+    return next(message, 0)
+
+    function next(message: Message<any>, middlewareNum: number): Promise<void> {
+      const middleware = middlewares[middlewareNum]
+
+      if (!middleware) {
+        if (isValidTopic(message.topic)) {
+          return backend.publish(message)
+        } else {
+          return Promise.reject(new Error(`Invalid topic: ${message.topic}`))
+        }
+      } else if (middleware.publish) {
+        return middleware.publish({
+          message,
+          next: (newMessage) => next(newMessage, middlewareNum + 1),
+          announce
+        })
+      } else {
+        return next(message, middlewareNum + 1)
+      }
+    }
   }
 }
 
@@ -54,4 +119,16 @@ function isValidTopic(topic: string) {
 
 function isValidTopicSelector(topicSelector: string) {
   return /^(\*|\*\*|[A-Z0-9_]+)(\.(\*|\*\*|[A-Z0-9_]+))*$/i.test(topicSelector)
+}
+
+/**
+ * Throws an error if the subscriber is invalid for some reason
+ */
+function validateSubscriber(subscriber: Subscriber<any>) {
+  const invalidTopics = subscriber.topics.filter(
+    (topic) => !isValidTopicSelector(topic)
+  )
+  if (invalidTopics.length) {
+    throw new Error(`Invalid topic selector(s): ${invalidTopics.join(', ')}`)
+  }
 }
