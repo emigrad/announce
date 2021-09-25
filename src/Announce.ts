@@ -1,5 +1,13 @@
+import cuid from 'cuid'
 import { BackendFactory } from './backends/BackendFactory'
-import { Backend, Message, Middleware, Subscriber } from './types'
+import {
+  Backend,
+  Headers,
+  Message,
+  Middleware,
+  PublishMessage,
+  Subscriber
+} from './types'
 
 export interface AnnounceOptions {
   backendFactory?: Pick<BackendFactory, 'getBackend'>
@@ -85,11 +93,19 @@ export class Announce {
     }
   }
 
-  publish(message: Message<any>): Promise<void> {
+  publish(message: PublishMessage<any>): Promise<void> {
     const { middlewares, backend } = this
     const announce = this
+    const headers = { ...message.headers } as Headers
 
-    return next(message, 0)
+    if (headers.id === undefined) {
+      headers.id = cuid()
+    }
+    if (headers.published === undefined) {
+      headers.published = new Date().toISOString()
+    }
+
+    return next({ ...message, headers }, 0)
 
     function next(message: Message<any>, middlewareNum: number): Promise<void> {
       const middleware = middlewares[middlewareNum]

@@ -1,4 +1,4 @@
-import { Subscriber } from '../types'
+import { Message, Subscriber } from '../types'
 
 export function getConcurrency(subscriber: Subscriber<any>): number {
   return subscriber.options?.concurrency ?? 1
@@ -17,4 +17,19 @@ export function hasDeadLetterQueue(subscriber: Subscriber<any>): boolean {
  */
 export function getDeadLetterQueue(subscriber: Subscriber<any>): string | null {
   return hasDeadLetterQueue(subscriber) ? `${subscriber.name}.dlq` : null
+}
+
+/**
+ * Returns the value of the given header
+ */
+export function getHeader(
+  message: Message<any>,
+  header: string
+): string | undefined {
+  const headers = message.headers
+  const matchingHeader = Object.keys(headers).find(
+    (currentHeader) => currentHeader.toLowerCase() === header.toLowerCase()
+  )
+
+  return matchingHeader !== undefined ? headers[matchingHeader] : undefined
 }

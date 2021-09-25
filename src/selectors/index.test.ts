@@ -1,5 +1,10 @@
-import { Subscriber } from '../types'
-import { getConcurrency, getDeadLetterQueue, hasDeadLetterQueue } from './index'
+import { Message, Subscriber } from '../types'
+import {
+  getConcurrency,
+  getDeadLetterQueue,
+  getHeader,
+  hasDeadLetterQueue
+} from './index'
 
 describe('Selectors', () => {
   it.each([
@@ -37,4 +42,24 @@ describe('Selectors', () => {
   ])('Should determine the concurrency (%p)', (options, expected) => {
     expect(getConcurrency({ options } as Subscriber<any>)).toBe(expected)
   })
+
+  it.each(['Content-Type', 'content-Type', 'content-type'])(
+    'Should correctly fetch the header %p',
+    (headerName) => {
+      const expected = 'expected value'
+      const message: Message<any> = {
+        topic: 'abc',
+        body: null,
+        headers: {
+          id: '3',
+          published: '',
+          header1: '1',
+          [headerName]: expected,
+          header2: '2'
+        }
+      }
+
+      expect(getHeader(message, 'Content-Type')).toBe(expected)
+    }
+  )
 })

@@ -21,3 +21,10 @@ export interface Message<Body extends any> {
   /** The actual data. Must be JSON-serialisable */
   body: Body
 }
+
+export type PublishMessage<Body extends any> = Omit<
+  Message<Body>,
+  'headers'
+> & {
+  headers?: Record<string, string>
+}

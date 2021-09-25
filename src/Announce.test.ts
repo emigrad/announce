@@ -2,8 +2,8 @@ import { Deferred } from 'ts-deferred'
 import { Announce } from './Announce'
 import { InMemoryBackend } from './backends'
 import { getCompleteHeaders } from './message'
-import { Logger, LoggerMiddleware } from './middleware'
-import { Subscriber } from './types'
+import { JSONConverter, Logger, LoggerMiddleware } from './middleware'
+import { Message, Subscriber } from './types'
 
 describe('Announce', () => {
   beforeEach(() => {
@@ -69,6 +69,27 @@ describe('Announce', () => {
     })
 
     await dfd.promise
+  })
+
+  it('Should be able to round-trip a JSON-encoded message', async () => {
+    const dfd = new Deferred()
+    const announce = new Announce('memory://')
+    const body = { hi: 'there' }
+    announce.use(new JSONConverter())
+
+    await announce.subscribe({
+      name: 'test',
+      topics: ['test'],
+      handle(message: Message<any>) {
+        dfd.resolve(message)
+      }
+    })
+    await announce.publish({ topic: 'test', body })
+
+    expect(await dfd.promise).toMatchObject({
+      headers: { 'Content-Type': 'application/json' },
+      body
+    })
   })
 
   it('Should throw an error if the URL is not defined', () => {
