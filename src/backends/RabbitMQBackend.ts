@@ -276,14 +276,21 @@ function convertMessage(message: ConsumeMessage): Message<Buffer> {
  */
 export function ensureCleanShutdown(connection: Connection) {
   const stream = (connection as any).connection?.stream
+  let destroyTimeout: NodeJS.Timeout
 
   if (!stream) {
     throw new Error('Unable to patch amqplib')
   }
 
-  connection.on('close', () => {
-    setTimeout(() => {
-      stream.destroy()
-    }, 1000)
-  })
+  stream.on('close', streamClosed)
+  connection.on('close', connectionClosed)
+
+  function connectionClosed() {
+    destroyTimeout = setTimeout(() => stream.destroy(), 1000)
+  }
+
+  function streamClosed() {
+    connection.removeListener('close', connectionClosed)
+    clearTimeout(destroyTimeout)
+  }
 }
