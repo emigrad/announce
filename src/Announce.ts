@@ -42,11 +42,11 @@ export class Announce extends EventEmitter {
   }
 
   /**
-   * Adds the middleware to the chain. When processing a message or
+   * Adds the middlewares to the chain. When processing a message or
    * subscriber, the middlewares are called in the order that they're added
    */
-  use(middleware: Middleware) {
-    this.middlewares.push(middleware)
+  use(...middlewares: Middleware[]) {
+    this.middlewares.push(...middlewares)
 
     return this
   }
