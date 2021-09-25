@@ -20,7 +20,7 @@ describe('Logger middleware', () => {
     [false, 'error'],
     [true, 'trace']
   ])('Should log publishes (success: %p)', async (succeeded, level) => {
-    const message = { topic: 'abc' } as Message<any>
+    const message = { topic: 'abc', headers: { id: '33' } } as Message<any>
     let next
 
     if (succeeded) {
@@ -65,7 +65,7 @@ describe('Logger middleware', () => {
     [true, 'trace']
   ])('Should log messages (success: %p)', async (succeeded, level) => {
     const subscriber = { name: 'abc' } as Subscriber<any>
-    const message = { topic: 'abc' } as Message<any>
+    const message = { topic: 'abc', headers: { id: '33' } } as Message<any>
     let next
 
     if (succeeded) {

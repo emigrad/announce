@@ -20,11 +20,16 @@ export class LoggerMiddleware implements Middleware {
   async publish({ message, next }: PublishMiddlewareArgs): Promise<void> {
     try {
       await next(message)
-      this.logger.trace(`Published message to ${message.topic}`)
+      this.logger.trace(
+        `Published message ${message.headers.id} to ${message.topic}`
+      )
     } catch (error) {
-      this.logger.error(`Error publishing message to ${message.topic}`, {
-        error
-      })
+      this.logger.error(
+        `Error publishing message ${message.headers.id} to ${message.topic}`,
+        {
+          error
+        }
+      )
       throw error
     }
   }
@@ -55,17 +60,20 @@ export class LoggerMiddleware implements Middleware {
     subscriber
   }: HandleMiddlewareArgs): Promise<void> {
     const start = Date.now()
+    const details = {
+      subscriber: subscriber.name,
+      topic: message.topic,
+      messageId: message.headers.id
+    }
     try {
       await next(message)
       this.logger.trace(`Handled message for ${subscriber.name}`, {
-        subscriber: subscriber.name,
-        topic: message.topic,
+        ...details,
         duration: Date.now() - start
       })
     } catch (error) {
       this.logger.error(`Error handling message for ${subscriber.name}`, {
-        subscriber: subscriber.name,
-        topic: message.topic,
+        ...details,
         duration: Date.now() - start,
         error
       })
