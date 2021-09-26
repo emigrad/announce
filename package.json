@@ -72,8 +72,8 @@
       "default",
       "jest-junit"
     ],
-    "rootDir": "src",
-    "coverageDirectory": "../coverage"
+    "roots": ["src"],
+    "coverageDirectory": "coverage"
   },
   "prettier": "prettier-config-standard"
 }
