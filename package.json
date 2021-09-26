@@ -15,7 +15,7 @@
     "check:lint": "eslint",
     "check:tests": "tsc -p tsconfig.tests.json",
     "format": "prettier --write \"src/**/*.{ts,json,md}\"",
-    "prepublishOnly": "run-p check test build",
+    "prepublishOnly": "run-p check test:ci build",
     "test": "jest",
     "test:ci": "jest --ci --collectCoverage",
     "test:watch": "jest --watch",
