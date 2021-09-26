@@ -4,7 +4,7 @@ stages:
   - build
   - release
 
-test:
+build:
   services:
     - rabbitmq:3-management-alpine
   variables:
@@ -12,26 +12,13 @@ test:
   stage: build
   script:
     - yarn
-    - yarn run test:ci
+    - yarn run prepublishOnly
   artifacts:
     reports:
       cobertura: coverage/cobertura-coverage.xml
       junit: junit.xml
-
-checks:
-  stage: build
-  script:
-    - yarn
-    - yarn run check
-
-build:
-  stage: build
-  script:
-    - yarn
-    - yarn run build
-  artifacts:
-    paths:
-      - dist
+  rules:
+    - if: $CI_COMMIT_BRANCH
 
 release:
   stage: release
@@ -53,6 +40,10 @@ release:
 
 publish:
   stage: release
+  services:
+    - rabbitmq:3-management-alpine
+  variables:
+    RABBITMQ_URL: amqp://rabbitmq
   script:
     - yarn
     - rm .npmrc
@@ -61,3 +52,8 @@ publish:
     - yarn publish
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+  artifacts:
+    reports:
+      cobertura: coverage/cobertura-coverage.xml
+      junit: junit.xml
+
