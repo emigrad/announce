@@ -3,11 +3,13 @@ import { EventEmitter } from 'events'
 import { BackendFactory } from './backends/BackendFactory'
 import {
   Backend,
+  HandlerMiddleware,
   Headers,
   Message,
   Middleware,
   PublishMessage,
-  Subscriber
+  Subscriber,
+  SubscriberMiddleware
 } from './types'
 
 export interface AnnounceOptions {
@@ -51,9 +53,9 @@ export class Announce extends EventEmitter {
     return this
   }
 
-  subscribe: (...args: [...Middleware[], Subscriber<any>]) => Promise<void> = (
-    ...args
-  ) => {
+  subscribe: (
+    ...args: [...(HandlerMiddleware | SubscriberMiddleware)[], Subscriber<any>]
+  ) => Promise<void> = (...args) => {
     const backend = this.backend
     const announce = this
     const originalSubscriber = args[args.length - 1] as Subscriber<any>
