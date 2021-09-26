@@ -6,6 +6,7 @@
     "dist"
   ],
   "license": "UNLICENSED",
+  "types": "dist/index.d.ts",
   "scripts": {
     "services:start": "docker-compose up",
     "services:stop": "docker-compose down",
