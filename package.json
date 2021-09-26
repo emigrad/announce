@@ -1,7 +1,7 @@
 {
   "name": "@emigrad/announce",
   "main": "dist/announce.js",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "files": [
     "dist"
   ],
@@ -73,7 +73,9 @@
       "default",
       "jest-junit"
     ],
-    "roots": ["src"],
+    "roots": [
+      "src"
+    ],
     "coverageDirectory": "coverage"
   },
   "prettier": "prettier-config-standard"
