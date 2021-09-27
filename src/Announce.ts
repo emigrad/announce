@@ -1,15 +1,12 @@
-import cuid from 'cuid'
 import { EventEmitter } from 'events'
-import { BackendFactory } from './backends/BackendFactory'
+import { BackendFactory } from './backends'
+import { getCompleteHeaders } from './message'
 import {
   Backend,
-  HandlerMiddleware,
-  Headers,
   Message,
   Middleware,
   PublishMessage,
-  Subscriber,
-  SubscriberMiddleware
+  Subscriber
 } from './types'
 
 export interface AnnounceOptions {
@@ -53,87 +50,17 @@ export class Announce extends EventEmitter {
     return this
   }
 
-  subscribe: (
-    ...args: [...(HandlerMiddleware | SubscriberMiddleware)[], Subscriber<any>]
-  ) => Promise<void> = (...args) => {
-    const backend = this.backend
-    const announce = this
-    const originalSubscriber = args[args.length - 1] as Subscriber<any>
-    const middlewares = [
-      ...this.middlewares,
-      ...(args.slice(0, -1) as Middleware[])
-    ]
-
-    return next({ ...originalSubscriber }, 0)
-
-    function next(
-      subscriber: Subscriber<any>,
-      middlewareNum: number
-    ): Promise<void> {
-      if (middlewareNum >= middlewares.length) {
-        validateSubscriber(subscriber)
-        return backend.subscribe(subscriber)
-      }
-
-      const middleware = middlewares[middlewareNum]
-      if (middleware.handle) {
-        const originalHandle = subscriber.handle.bind(subscriber)
-        subscriber.handle = (message) => {
-          return middleware.handle!({
-            message,
-            next: originalHandle,
-            subscriber,
-            announce
-          })
-        }
-      }
-
-      if (middleware.subscribe) {
-        return middleware.subscribe({
-          subscriber,
-          next: (newSubscriber) => next(newSubscriber, middlewareNum + 1),
-          announce
-        })
-      } else {
-        return next(subscriber, middlewareNum + 1)
-      }
-    }
+  subscribe<Body extends any = any>(
+    subscriber: Subscriber<Body>
+  ): Promise<void> {
+    return this._subscribe(subscriber, this.middlewares)
   }
 
   publish(message: PublishMessage<any>): Promise<void> {
-    const { middlewares, backend } = this
-    const announce = this
-    const headers = { ...message.headers } as Headers
-
-    if (headers.id === undefined) {
-      headers.id = cuid()
-    }
-    if (headers.published === undefined) {
-      headers.published = new Date().toISOString()
-    }
-
-    return next({ ...message, headers }, 0)
-
-    function next(message: Message<any>, middlewareNum: number): Promise<void> {
-      const middleware = middlewares[middlewareNum]
-
-      if (!middleware) {
-        try {
-          validateMessage(message)
-        } catch (e) {
-          return Promise.reject(e)
-        }
-        return backend.publish(message)
-      } else if (middleware.publish) {
-        return middleware.publish({
-          message,
-          next: (newMessage) => next(newMessage, middlewareNum + 1),
-          announce
-        })
-      } else {
-        return next(message, middlewareNum + 1)
-      }
-    }
+    return this._publish(
+      { ...message, headers: getCompleteHeaders({ ...message.headers }) },
+      this.middlewares
+    )
   }
 
   async close() {
@@ -149,6 +76,64 @@ export class Announce extends EventEmitter {
     this.close().catch(() => {
       // We don't care about any errors when trying to shut down
     })
+  }
+
+  private _subscribe(
+    subscriber: Subscriber<any>,
+    middlewares: readonly Middleware[]
+  ): Promise<void> {
+    if (!middlewares.length) {
+      validateSubscriber(subscriber)
+      return this.backend.subscribe(subscriber)
+    }
+
+    const [middleware, ...remainingMiddlewares] = middlewares
+    if (middleware.handle) {
+      const originalHandle = subscriber.handle.bind(subscriber)
+      subscriber.handle = (message) => {
+        return middleware.handle!({
+          message,
+          next: originalHandle,
+          subscriber,
+          announce: this
+        })
+      }
+    }
+
+    if (middleware.subscribe) {
+      return middleware.subscribe({
+        subscriber,
+        next: (newSubscriber) =>
+          this._subscribe(newSubscriber, remainingMiddlewares),
+        announce: this
+      })
+    } else {
+      return this._subscribe(subscriber, remainingMiddlewares)
+    }
+  }
+
+  private _publish(
+    message: Message<any>,
+    middlewares: readonly Middleware[]
+  ): Promise<void> {
+    const [middleware, ...remainingMiddlewares] = middlewares
+
+    if (!middleware) {
+      try {
+        validateMessage(message)
+      } catch (e) {
+        return Promise.reject(e)
+      }
+      return this.backend.publish(message)
+    } else if (middleware.publish) {
+      return middleware.publish({
+        message,
+        next: (newMessage) => this._publish(newMessage, remainingMiddlewares),
+        announce: this
+      })
+    } else {
+      return this._publish(message, remainingMiddlewares)
+    }
   }
 }
 
