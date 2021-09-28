@@ -44,10 +44,25 @@ export class Announce extends EventEmitter {
    * Adds the middlewares to the chain. When processing a message or
    * subscriber, the middlewares are called in the order that they're added
    */
-  use(...middlewares: Middleware[]) {
+  use(...middlewares: Middleware[]): this {
     this.middlewares.push(...middlewares)
 
     return this
+  }
+
+  /**
+   * Returns a copy of the Announce instance with the middlewares added to the
+   * chain. Use this instead of use() when you'd like the middlewares to be
+   * active only for certain subscribers or publish calls.
+   *
+   * @example announce.with(delay(15000)).subscribe(mySubscriber) will
+   *  subscribe mySubscriber, but it will receive the messages after a
+   *  15 second delay
+   */
+  with(...middlewares: Middleware[]): Announce {
+    return Object.create(this, {
+      middlewares: { value: [...this.middlewares, ...middlewares] }
+    })
   }
 
   subscribe<Body extends any = any>(

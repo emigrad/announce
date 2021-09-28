@@ -146,9 +146,7 @@ describe('Announce', () => {
     async (rejection) => {
       const dfd = new Deferred()
       const backend = new InMemoryBackend()
-      const backendFactory = {
-        getBackend: jest.fn().mockReturnValue(backend)
-      }
+      const backendFactory = { getBackend: jest.fn().mockReturnValue(backend) }
       // Simulate a rejection of the close promise, to ensure we correctly
       // handle it
       if (rejection) {
@@ -164,4 +162,55 @@ describe('Announce', () => {
       await dfd.promise
     }
   )
+
+  it('Should support with()', async () => {
+    const rawDfd = new Deferred()
+    const jsonDfd = new Deferred()
+    const middleware = {
+      publish: jest.fn(({ message, next }) => next(message))
+    }
+    const announce = new Announce('memory://')
+    announce.use(middleware)
+    const jsonAnnounce = announce.with(new JSONConverter())
+    const message = { topic: 'blah', body: { hi: 'there' } }
+
+    await announce.subscribe({
+      name: 'raw',
+      topics: ['*'],
+      handle: rawDfd.resolve
+    })
+    await jsonAnnounce.subscribe({
+      name: 'json',
+      topics: ['*'],
+      handle: jsonDfd.resolve
+    })
+
+    // The base announce should not serialise the message to a Buffer,
+    // so should not be able to publish non-buffer messages
+    await expect(announce.publish(message)).rejects.toBeDefined()
+
+    middleware.publish.mockClear()
+
+    // This should succeed because we have the JSON middleware
+    await jsonAnnounce.publish(message)
+
+    expect(((await rawDfd.promise) as Message<any>).body).toBeInstanceOf(Buffer)
+    expect(((await jsonDfd.promise) as Message<any>).body).toEqual(message.body)
+
+    // The base announce's middleware should have been called before the
+    // json announce's middleware. If it's called after, the message body
+    // will be a Buffer instead
+    expect(middleware.publish).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.objectContaining(message) })
+    )
+  })
+
+  it(`with()'ed instances should still emit events`, async () => {
+    const dfd = new Deferred()
+    const announce = new Announce('memory://')
+    announce.with(new JSONConverter()).on('close', dfd.resolve)
+
+    await announce.close()
+    await dfd.promise
+  })
 })
