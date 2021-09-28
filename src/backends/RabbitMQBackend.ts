@@ -2,7 +2,7 @@ import { Channel, ConfirmChannel, connect, Connection } from 'amqplib'
 import { ConsumeMessage, Options } from 'amqplib/properties'
 import { EventEmitter } from 'events'
 import { getConcurrency, hasDeadLetterQueue } from '../selectors'
-import { Backend, Message, Subscriber } from '../types'
+import { Backend, BackendSubscriber, Message, Subscriber } from '../types'
 
 export interface RabbitMQOptions {
   exchange?: string
@@ -19,7 +19,7 @@ export interface RabbitMQOptions {
  */
 export class RabbitMQBackend extends EventEmitter implements Backend {
   private readonly exchange: string
-  private readonly subscribers: Subscriber<Buffer>[]
+  private readonly subscribers: BackendSubscriber[]
   private readonly subscriberChannels: Record<number, PromiseLike<Channel>>
   private readonly rebuildPromises: Record<number, PromiseLike<any>>
   private connection: PromiseLike<Connection>
@@ -71,7 +71,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     })
   }
 
-  async subscribe(subscriber: Subscriber<Buffer>): Promise<void> {
+  async subscribe(subscriber: BackendSubscriber): Promise<void> {
     this.subscribers.push(subscriber)
 
     await this.createQueue(subscriber)
@@ -180,7 +180,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     )
   }
 
-  private async consume(subscriber: Subscriber<Buffer>): Promise<void> {
+  private async consume(subscriber: BackendSubscriber): Promise<void> {
     const channel = await this.getChannelForSubscriber(subscriber)
 
     await channel.consume(subscriber.name, async (message) => {

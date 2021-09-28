@@ -1,11 +1,11 @@
 import { Announce } from '../Announce'
 import { getHeader } from '../selectors'
 import { Message, Subscriber } from '../types'
-import { JSONConverter } from './JSONConverter'
+import { jsonSerializer } from './jsonSerializer'
 
-describe('JSONConverter', () => {
-  const jsonConverter = new JSONConverter()
+describe('JSONSerializer', () => {
   const announce = {} as Announce
+  const serializer = jsonSerializer()(announce)
   const subscriber = {} as Subscriber<any>
 
   it('Should stringify messages that are not Buffers', async () => {
@@ -13,9 +13,7 @@ describe('JSONConverter', () => {
     const next = jest.fn().mockResolvedValue(nextResult)
     const message = { body: { hi: 'there' } } as Message<any>
 
-    expect(await jsonConverter.publish({ message, next, announce })).toBe(
-      nextResult
-    )
+    expect(await serializer.publish!({ message, next })).toBe(nextResult)
     expect(JSON.parse(next.mock.calls[0][0].body.toString())).toEqual(
       message.body
     )
@@ -32,9 +30,7 @@ describe('JSONConverter', () => {
       headers: {}
     } as Message<any>
 
-    expect(await jsonConverter.publish({ message, next, announce })).toBe(
-      nextResult
-    )
+    expect(await serializer.publish!({ message, next })).toBe(nextResult)
     expect(next).toHaveBeenCalledWith(message)
     expect(
       getHeader(next.mock.calls[0][0] as Message<any>, 'Content-Type')
@@ -51,9 +47,9 @@ describe('JSONConverter', () => {
       headers: { id: '3', published: 'ff', 'content-type': 'application/json' }
     } as Message<any>
 
-    expect(
-      await jsonConverter.handle({ message, next, subscriber, announce })
-    ).toBe(nextResult)
+    expect(await serializer.handle!({ message, next, subscriber })).toBe(
+      nextResult
+    )
     expect(next.mock.calls[0][0].body).toEqual(body)
   })
 
@@ -68,9 +64,9 @@ describe('JSONConverter', () => {
         headers: { id: '3', published: 'ff', 'content-type': contentType }
       } as Message<any>
 
-      expect(
-        await jsonConverter.handle({ message, next, subscriber, announce })
-      ).toBe(nextResult)
+      expect(await serializer.handle!({ message, next, subscriber })).toBe(
+        nextResult
+      )
       expect(next).toHaveBeenCalledWith(message)
     }
   )

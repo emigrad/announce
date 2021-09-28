@@ -1,12 +1,12 @@
 import { Deferred } from 'ts-deferred'
 import { getConcurrency } from '../selectors'
-import { Message, Subscriber } from '../types'
+import { BackendSubscriber, Message } from '../types'
 import { InMemoryBackend } from './InMemoryBackend'
 
 describe('In memory backend', () => {
   it('Should publish and receive messages', async () => {
     const dfd = new Deferred<Message<Buffer>>()
-    const subscriber: Subscriber<Buffer> = {
+    const subscriber: BackendSubscriber = {
       name: 'test',
       topics: ['foo.bar'],
       handle: (message) => dfd.resolve(message)
@@ -42,10 +42,12 @@ describe('In memory backend', () => {
     'Should support wildcards in topic selectors (selector: %p, topic: %p)',
     async (selector, topic, expected) => {
       let receivedMessage = false
-      const subscriber: Subscriber<Buffer> = {
+      const subscriber: BackendSubscriber = {
         name: 'test',
         topics: [selector],
-        handle: () => (receivedMessage = true)
+        handle: () => {
+          receivedMessage = true
+        }
       }
       const message: Message<Buffer> = {
         headers: { id: 'abcd', published: new Date().toISOString() },
@@ -74,7 +76,7 @@ describe('In memory backend', () => {
     ]
     const done = Promise.all(dfds.map(({ promise }) => promise))
 
-    const subscriber: Subscriber<Buffer> = {
+    const subscriber: BackendSubscriber = {
       name: 'test',
       topics: ['foo'],
       handle: async ({ body }) => {

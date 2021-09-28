@@ -1,9 +1,9 @@
 import { EventEmitter } from 'events'
 import PromiseQueue from 'promise-queue'
 import { getConcurrency } from '../selectors'
-import { Backend, Message, Subscriber } from '../types'
+import { Backend, BackendSubscriber, Message, Subscriber } from '../types'
 
-export interface SubscriberWithQueue extends Subscriber<Buffer> {
+export interface SubscriberWithQueue extends BackendSubscriber {
   queue: PromiseQueue
 }
 
@@ -15,7 +15,7 @@ export abstract class LocalBackend extends EventEmitter implements Backend {
   /**
    * Registers a subscriber
    */
-  async subscribe(subscriber: Subscriber<Buffer>): Promise<void> {
+  async subscribe(subscriber: BackendSubscriber): Promise<void> {
     this.subscribers.push({
       ...subscriber,
       queue: new PromiseQueue(getConcurrency(subscriber))

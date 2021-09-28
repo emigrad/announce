@@ -4,7 +4,7 @@ import { resolve } from 'path'
 import rimrafCb from 'rimraf'
 import { Deferred } from 'ts-deferred'
 import { promisify } from 'util'
-import { Message, Subscriber } from '../types'
+import { BackendSubscriber, Message } from '../types'
 import { FileBackend } from './FileBackend'
 
 const rimraf = promisify(rimrafCb)
@@ -25,7 +25,7 @@ describe('File backend', () => {
 
   it('Should publish and receive messages', async () => {
     const dfd = new Deferred<Message<Buffer>>()
-    const subscriber: Subscriber<Buffer> = {
+    const subscriber: BackendSubscriber = {
       name: 'test',
       topics: ['foo.bar'],
       handle: (message) => dfd.resolve(message)
@@ -61,10 +61,12 @@ describe('File backend', () => {
     'Should support wildcards in topic selectors (selector: %p, topic: %p)',
     async (selector, topic, expected) => {
       let receivedMessage = false
-      const subscriber: Subscriber<{}> = {
+      const subscriber: BackendSubscriber = {
         name: 'test',
         topics: [selector],
-        handle: () => (receivedMessage = true)
+        handle: () => {
+          receivedMessage = true
+        }
       }
       const message: Message<Buffer> = {
         headers: { id: 'abcd', published: new Date().toISOString() },
@@ -92,7 +94,7 @@ describe('File backend', () => {
     ]
     const done = Promise.all(dfds.map(({ promise }) => promise))
 
-    const subscriber: Subscriber<Buffer> = {
+    const subscriber: BackendSubscriber = {
       name: 'test',
       topics: ['foo'],
       handle: async ({ body }) => {
@@ -122,12 +124,12 @@ describe('File backend', () => {
 
   it('Should redeliver messages that did not complete processing', async () => {
     const dfd = new Deferred()
-    const subscriber1: Subscriber<{}> = {
+    const subscriber1: BackendSubscriber = {
       name: 'test',
       topics: ['foo.bar'],
       handle: () => new Promise(() => {})
     }
-    const subscriber2: Subscriber<{}> = {
+    const subscriber2: BackendSubscriber = {
       name: 'test',
       topics: ['foo.bar'],
       handle: () => dfd.resolve()
@@ -152,7 +154,7 @@ describe('File backend', () => {
   it('Should not redeliver messages that were successfully processed', async () => {
     const dfd = new Deferred()
     let handleCount = 0
-    const subscriber: Subscriber<Buffer> = {
+    const subscriber: BackendSubscriber = {
       name: 'test',
       topics: ['foo.bar'],
       handle: () => {
@@ -183,7 +185,7 @@ describe('File backend', () => {
     async (currentlySubscribed) => {
       const subscriberDfd = new Deferred()
       const dlqSubscriberDfd = new Deferred()
-      const subscriber: Subscriber<{}> = {
+      const subscriber: BackendSubscriber = {
         name: 'test',
         topics: ['foo.bar'],
         handle: () => {
@@ -191,7 +193,7 @@ describe('File backend', () => {
           return Promise.reject()
         }
       }
-      const dlqSubscriber: Subscriber<Buffer> = {
+      const dlqSubscriber: BackendSubscriber = {
         name: 'test.dlq',
         topics: [],
         handle: () => dlqSubscriberDfd.resolve()

@@ -5,6 +5,7 @@ import {
   Backend,
   Message,
   Middleware,
+  MiddlewareInstance,
   PublishMessage,
   Subscriber
 } from './types'
@@ -15,7 +16,7 @@ export interface AnnounceOptions {
 
 export class Announce extends EventEmitter {
   private readonly backend: Backend
-  private readonly middlewares: Middleware[]
+  private readonly middlewares: MiddlewareInstance[]
   private closePromise: Promise<void> | undefined
 
   constructor(
@@ -45,7 +46,9 @@ export class Announce extends EventEmitter {
    * subscriber, the middlewares are called in the order that they're added
    */
   use(...middlewares: Middleware[]): this {
-    this.middlewares.push(...middlewares)
+    this.middlewares.push(
+      ...middlewares.map((constructor) => constructor(this))
+    )
 
     return this
   }
@@ -60,15 +63,17 @@ export class Announce extends EventEmitter {
    *  15 second delay
    */
   with(...middlewares: Middleware[]): Announce {
-    return Object.create(this, {
-      middlewares: { value: [...this.middlewares, ...middlewares] }
+    const copy = Object.create(this, {
+      middlewares: { value: [...this.middlewares] }
     })
+
+    return copy.use(...middlewares)
   }
 
   subscribe<Body extends any = any>(
     subscriber: Subscriber<Body>
   ): Promise<void> {
-    return this._subscribe(subscriber, this.middlewares)
+    return this._subscribe({ ...subscriber }, this.middlewares)
   }
 
   publish(message: PublishMessage<any>): Promise<void> {
@@ -100,23 +105,20 @@ export class Announce extends EventEmitter {
 
   private _subscribe(
     subscriber: Subscriber<any>,
-    middlewares: readonly Middleware[]
+    middlewares: readonly MiddlewareInstance[]
   ): Promise<void> {
+    const announce = this
+    const origHandle = subscriber.handle.bind(subscriber)
+
     if (!middlewares.length) {
       validateSubscriber(subscriber)
-      return this.backend.subscribe(subscriber)
+      return this.backend.subscribe({ ...subscriber, handle: next })
     }
 
     const [middleware, ...remainingMiddlewares] = middlewares
     if (middleware.handle) {
-      const originalHandle = subscriber.handle.bind(subscriber)
       subscriber.handle = (message) => {
-        return middleware.handle!({
-          message,
-          next: originalHandle,
-          subscriber,
-          announce: this
-        })
+        return middleware.handle!({ message, next, subscriber })
       }
     }
 
@@ -124,17 +126,20 @@ export class Announce extends EventEmitter {
       return middleware.subscribe({
         subscriber,
         next: (newSubscriber) =>
-          this._subscribe(newSubscriber, remainingMiddlewares),
-        announce: this
+          this._subscribe(newSubscriber, remainingMiddlewares)
       })
     } else {
       return this._subscribe(subscriber, remainingMiddlewares)
+    }
+
+    function next(message: Message<any>): Promise<void> {
+      return origHandle(message, { announce })
     }
   }
 
   private _publish(
     message: Message<any>,
-    middlewares: readonly Middleware[]
+    middlewares: readonly MiddlewareInstance[]
   ): Promise<void> {
     const [middleware, ...remainingMiddlewares] = middlewares
 
@@ -148,8 +153,7 @@ export class Announce extends EventEmitter {
     } else if (middleware.publish) {
       return middleware.publish({
         message,
-        next: (newMessage) => this._publish(newMessage, remainingMiddlewares),
-        announce: this
+        next: (newMessage) => this._publish(newMessage, remainingMiddlewares)
       })
     } else {
       return this._publish(message, remainingMiddlewares)

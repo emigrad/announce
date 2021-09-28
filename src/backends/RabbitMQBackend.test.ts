@@ -2,7 +2,7 @@ import { Channel, connect, Connection } from 'amqplib'
 import cuid from 'cuid'
 import { config } from 'dotenv-flow'
 import { Deferred } from 'ts-deferred'
-import { Headers, Subscriber } from '../types'
+import { BackendSubscriber, Headers } from '../types'
 import { RabbitMQBackend } from './RabbitMQBackend'
 
 config({ silent: true, purge_dotenv: true })
@@ -46,7 +46,7 @@ describe('RabbitMQ Backend', () => {
       header1: 'Test'
     }
     const body = Buffer.from('hi there')
-    const subscriber: Subscriber<Buffer> = {
+    const subscriber: BackendSubscriber = {
       name: queueName,
       topics: ['test.*'],
       async handle(message) {
@@ -73,14 +73,14 @@ describe('RabbitMQ Backend', () => {
       published: '2020-01-02T18:19:20.000Z',
       header1: 'Test'
     }
-    const subscriber1: Subscriber<Buffer> = {
+    const subscriber1: BackendSubscriber = {
       name: queueName1,
       topics: ['test.test1'],
       async handle({ body }) {
         dfd1.resolve(body)
       }
     }
-    const subscriber2: Subscriber<Buffer> = {
+    const subscriber2: BackendSubscriber = {
       name: queueName2,
       topics: ['test.test2'],
       async handle({ body }) {
@@ -114,7 +114,7 @@ describe('RabbitMQ Backend', () => {
         id: cuid(),
         published: new Date().toISOString()
       }
-      const subscriber: Subscriber<Buffer> = {
+      const subscriber: BackendSubscriber = {
         name: queueName,
         topics: [topic],
         options: { deadLetterQueue: enableDlq },
@@ -151,7 +151,7 @@ describe('RabbitMQ Backend', () => {
       published: '2020-01-02T18:19:20.000Z'
     }
     const receivedMessageTimes: number[] = []
-    const subscriber: Subscriber<Buffer> = {
+    const subscriber: BackendSubscriber = {
       name: queueName,
       topics: ['test.*'],
       options: { concurrency },
@@ -210,7 +210,7 @@ describe('RabbitMQ Backend', () => {
 
   it('Should emit error if queue deleted', async () => {
     const dfd = new Deferred()
-    const subscriber: Subscriber<Buffer> = {
+    const subscriber: BackendSubscriber = {
       name: queueName,
       topics: ['test.*'],
       async handle(message) {

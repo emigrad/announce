@@ -2,8 +2,8 @@ import { Deferred } from 'ts-deferred'
 import { Announce } from './Announce'
 import { InMemoryBackend } from './backends'
 import { getCompleteHeaders } from './message'
-import { JSONConverter, Logger, LoggerMiddleware } from './middleware'
-import { Message, Subscriber } from './types'
+import { jsonSerializer, log } from './middleware'
+import { Logger, Message, Subscriber } from './types'
 
 describe('Announce', () => {
   beforeEach(() => {
@@ -59,7 +59,7 @@ describe('Announce', () => {
       trace: jest.fn()
     } as Logger
     const announce = new Announce('memory://')
-    announce.use(new LoggerMiddleware(logger))
+    announce.use(log(logger))
 
     await announce.subscribe(subscriber)
     await announce.publish({
@@ -75,7 +75,7 @@ describe('Announce', () => {
     const dfd = new Deferred()
     const announce = new Announce('memory://')
     const body = { hi: 'there' }
-    announce.use(new JSONConverter())
+    announce.use(jsonSerializer())
 
     await announce.subscribe({
       name: 'test',
@@ -170,8 +170,8 @@ describe('Announce', () => {
       publish: jest.fn(({ message, next }) => next(message))
     }
     const announce = new Announce('memory://')
-    announce.use(middleware)
-    const jsonAnnounce = announce.with(new JSONConverter())
+    announce.use(() => middleware)
+    const jsonAnnounce = announce.with(jsonSerializer())
     const message = { topic: 'blah', body: { hi: 'there' } }
 
     await announce.subscribe({
@@ -208,7 +208,7 @@ describe('Announce', () => {
   it(`with()'ed instances should still emit events`, async () => {
     const dfd = new Deferred()
     const announce = new Announce('memory://')
-    announce.with(new JSONConverter()).on('close', dfd.resolve)
+    announce.with(jsonSerializer()).on('close', dfd.resolve)
 
     await announce.close()
     await dfd.promise

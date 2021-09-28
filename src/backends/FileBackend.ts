@@ -9,7 +9,7 @@ import {
 import { resolve } from 'path'
 import { promisify } from 'util'
 import { getDeadLetterQueue, hasDeadLetterQueue } from '../selectors'
-import { Message, Subscriber } from '../types'
+import { BackendSubscriber, Message, Subscriber } from '../types'
 import { LocalBackend, SubscriberWithQueue } from './LocalBackend'
 
 const mkdir = promisify(mkdirCb)
@@ -46,7 +46,7 @@ export class FileBackend extends LocalBackend {
     this.queuePath = resolve(path, 'queues')
   }
 
-  async subscribe(subscriber: Subscriber<Buffer>): Promise<void> {
+  async subscribe(subscriber: BackendSubscriber): Promise<void> {
     await super.subscribe(subscriber)
     await this.queuePersistedMessages(subscriber)
   }

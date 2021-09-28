@@ -1,8 +1,4 @@
-import { Message } from './Message'
-
-export interface Handler<Body extends any> {
-  (message: Message<Body>): any | Promise<any>
-}
+import { Handler } from './Handler'
 
 export interface SubscriberOptions {
   /**

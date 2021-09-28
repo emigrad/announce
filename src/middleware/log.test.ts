@@ -1,11 +1,11 @@
 import { Announce } from '../Announce'
-import { Message, Subscriber } from '../types'
-import { Logger, LoggerMiddleware } from './LoggerMiddleware'
+import { Logger, Message, MiddlewareInstance, Subscriber } from '../types'
+import { log } from './log'
 
 describe('Logger middleware', () => {
-  const announce = {} as Announce
   let logger: Logger
-  let loggerMiddleware: LoggerMiddleware
+  const announce = {} as Announce
+  let loggerMiddleware: MiddlewareInstance
 
   beforeEach(() => {
     logger = {
@@ -13,7 +13,7 @@ describe('Logger middleware', () => {
       info: jest.fn(),
       error: jest.fn()
     }
-    loggerMiddleware = new LoggerMiddleware(logger)
+    loggerMiddleware = log(logger)(announce)
   })
 
   it.each([
@@ -25,13 +25,13 @@ describe('Logger middleware', () => {
 
     if (succeeded) {
       next = jest.fn().mockResolvedValue(null)
-      await loggerMiddleware.publish({ message, next, announce })
+      await loggerMiddleware.publish!({ message, next })
     } else {
       const error = new Error()
       next = jest.fn().mockRejectedValue(error)
-      await expect(
-        loggerMiddleware.publish({ message, next, announce })
-      ).rejects.toBe(error)
+      await expect(loggerMiddleware.publish!({ message, next })).rejects.toBe(
+        error
+      )
     }
 
     expect(next).toHaveBeenCalledWith(message)
@@ -47,12 +47,12 @@ describe('Logger middleware', () => {
 
     if (succeeded) {
       next = jest.fn().mockResolvedValue(null)
-      await loggerMiddleware.subscribe({ subscriber, next, announce })
+      await loggerMiddleware.subscribe!({ subscriber, next })
     } else {
       const error = new Error()
       next = jest.fn().mockRejectedValue(error)
       await expect(
-        loggerMiddleware.subscribe({ subscriber, next, announce })
+        loggerMiddleware.subscribe!({ subscriber, next })
       ).rejects.toBe(error)
     }
 
@@ -70,12 +70,12 @@ describe('Logger middleware', () => {
 
     if (succeeded) {
       next = jest.fn().mockResolvedValue(null)
-      await loggerMiddleware.handle({ next, subscriber, message, announce })
+      await loggerMiddleware.handle!({ next, subscriber, message })
     } else {
       const error = new Error()
       next = jest.fn().mockRejectedValue(error)
       await expect(
-        loggerMiddleware.handle({ message, next, subscriber, announce })
+        loggerMiddleware.handle!({ message, next, subscriber })
       ).rejects.toBe(error)
     }
 

@@ -1,4 +1,7 @@
 export * from './Backend'
+export * from './Handler'
+export * from './Logger'
 export * from './Message'
 export * from './Middleware'
 export * from './Subscriber'
+export * from './SubscriberWrapper'

@@ -1,12 +1,8 @@
 import { getHeader } from '../selectors'
-import {
-  HandleMiddlewareArgs,
-  Middleware,
-  PublishMiddlewareArgs
-} from '../types'
+import { Middleware } from '../types'
 
-export class JSONConverter implements Middleware {
-  async publish({ message, next }: PublishMiddlewareArgs): Promise<void> {
+export const jsonSerializer: () => Middleware = () => () => ({
+  async publish({ message, next }): Promise<void> {
     const { body, headers } = message
 
     if (!(body instanceof Buffer)) {
@@ -18,9 +14,9 @@ export class JSONConverter implements Middleware {
     }
 
     return next(message)
-  }
+  },
 
-  async handle({ message, next }: HandleMiddlewareArgs): Promise<void> {
+  async handle({ message, next }): Promise<void> {
     if (getHeader(message, 'Content-Type') === 'application/json') {
       return next({
         ...message,
@@ -30,4 +26,4 @@ export class JSONConverter implements Middleware {
       return next(message)
     }
   }
-}
+})
