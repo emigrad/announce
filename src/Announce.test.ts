@@ -118,7 +118,8 @@ describe('Announce', () => {
 
   it('Should close the backend when the backend encounters an error', async () => {
     const error = new Error()
-    const dfd = new Deferred()
+    const errorDfd = new Deferred()
+    const closeDfd = new Deferred()
     const backend = new InMemoryBackend()
     const backendFactory = {
       getBackend: jest.fn().mockReturnValue(backend)
@@ -128,12 +129,39 @@ describe('Announce', () => {
     backend.close = jest.fn().mockRejectedValue(undefined)
 
     const announce = new Announce('memory://', { backendFactory })
-    announce.on('error', dfd.resolve)
+    announce.on('error', errorDfd.resolve)
+    announce.on('close', closeDfd.resolve)
 
     // Report a unrecoverable error
     backend.emit('error', error)
 
-    expect(await dfd.promise).toBe(error)
+    expect(await errorDfd.promise).toBe(error)
     expect(backend.close).toHaveBeenCalled()
+
+    await closeDfd.promise
   })
+
+  it.each([false, true])(
+    'Should emit a close event when closing, even if the backend rejects the promise (rejected %p)',
+    async (rejection) => {
+      const dfd = new Deferred()
+      const backend = new InMemoryBackend()
+      const backendFactory = {
+        getBackend: jest.fn().mockReturnValue(backend)
+      }
+      // Simulate a rejection of the close promise, to ensure we correctly
+      // handle it
+      if (rejection) {
+        backend.close = () => Promise.reject()
+      } else {
+        backend.close = () => Promise.resolve()
+      }
+
+      const announce = new Announce('memory://', { backendFactory })
+      announce.on('close', dfd.resolve)
+
+      await announce.close()
+      await dfd.promise
+    }
+  )
 })

@@ -65,7 +65,12 @@ export class Announce extends EventEmitter {
 
   async close() {
     if (!this.closePromise) {
-      this.closePromise = this.backend.close()
+      this.closePromise = this.backend
+        .close()
+        .catch(() => {})
+        .then(() => {
+          this.emit('close')
+        })
     }
 
     return this.closePromise
