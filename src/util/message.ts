@@ -2,7 +2,7 @@ import cuid from 'cuid'
 import {
   Message,
   MessageProperties,
-  PublishMessage,
+  UnpublishedMessage,
   Subscriber
 } from '../types'
 
@@ -15,7 +15,7 @@ export function createMessage<Body extends any>(
   body: Body,
   headers: Record<string, string> = {},
   properties: Partial<MessageProperties> = {}
-): PublishMessage<Body> {
+): UnpublishedMessage<Body> {
   return { topic, body, headers, properties }
 }
 
@@ -23,7 +23,7 @@ export function createMessage<Body extends any>(
  * Returns a complete message with a unique ID and publication date.
  */
 export function getCompleteMessage<Body extends any>(
-  message: PublishMessage<Body>
+  message: UnpublishedMessage<Body>
 ): Message<Body> {
   return {
     ...message,

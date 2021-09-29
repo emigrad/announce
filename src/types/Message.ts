@@ -13,15 +13,21 @@ export interface Headers {
   [key: string]: string
 }
 
-export interface Message<Body extends any> {
+export interface UnpublishedMessage<Body extends any> {
   /** The topic of the message. Must be a dotted string */
   topic: string
-  /** The message's metadata */
-  properties: MessageProperties
-  /** Metadata about the message */
-  headers: Record<string, string>
   /** The actual data. Must be JSON-serialisable */
   body: Body
+  /** Application-specific headers */
+  headers?: Record<string, string>
+  /** The message's metadata */
+  properties?: Partial<MessageProperties>
+}
+
+export interface Message<Body extends any>
+  extends Required<UnpublishedMessage<Body>> {
+  /** The message's metadata */
+  properties: MessageProperties
 }
 
 export interface MessageProperties {
@@ -29,12 +35,4 @@ export interface MessageProperties {
   id: string
   /** When the message was published */
   publishedAt: Date
-}
-
-export type PublishMessage<Body extends any> = Omit<
-  Message<Body>,
-  'headers' | 'properties'
-> & {
-  headers?: Record<string, string>
-  properties?: Partial<MessageProperties>
 }

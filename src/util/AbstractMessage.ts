@@ -1,10 +1,10 @@
-import { MessageProperties, PublishMessage } from '../types'
+import { MessageProperties, UnpublishedMessage } from '../types'
 
 /**
  * This is a utility class
  */
 export abstract class AbstractMessage<Body extends {}>
-  implements PublishMessage<Body>
+  implements UnpublishedMessage<Body>
 {
   public abstract topic: string
   public headers: Record<string, string>

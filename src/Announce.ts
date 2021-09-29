@@ -5,7 +5,7 @@ import {
   Message,
   Middleware,
   MiddlewareInstance,
-  PublishMessage,
+  UnpublishedMessage,
   Subscriber
 } from './types'
 import { getCompleteMessage } from './util'
@@ -77,7 +77,7 @@ export class Announce extends EventEmitter {
   }
 
   async publish<Body extends any>(
-    message: PublishMessage<Body>
+    message: UnpublishedMessage<Body>
   ): Promise<Message<Body>> {
     const completeMessage = getCompleteMessage(message)
     await this._publish(completeMessage, this.middlewares)
