@@ -85,7 +85,7 @@ export class Announce extends EventEmitter {
     return completeMessage
   }
 
-  async close() {
+  close() {
     if (!this.closePromise) {
       this.closePromise = this.backend
         .close()
@@ -100,9 +100,7 @@ export class Announce extends EventEmitter {
 
   destroy(err: any) {
     this.emit('error', err)
-    this.close().catch(() => {
-      // We don't care about any errors when trying to shut down
-    })
+    return this.close()
   }
 
   private _subscribe(

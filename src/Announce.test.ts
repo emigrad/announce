@@ -199,6 +199,26 @@ describe('Announce', () => {
     )
   })
 
+  it('Should skip non-publish middlewares when publishing', async () => {
+    const dfd = new Deferred()
+    const middleware = {
+      subscribe: jest.fn(({ subscriber, next }) => next(subscriber))
+    }
+    const announce = new Announce('memory://')
+    announce.use(jsonSerializer(), () => middleware)
+
+    await announce.subscribe({
+      name: 'json',
+      topics: ['*'],
+      handle: dfd.resolve
+    })
+
+    const message = { topic: 'blah', body: { hi: 'there' } }
+    await announce.publish(message)
+
+    expect(await dfd.promise).toMatchObject(message)
+  })
+
   it(`with()'ed instances should still emit events`, async () => {
     const dfd = new Deferred()
     const announce = new Announce('memory://')
@@ -206,5 +226,11 @@ describe('Announce', () => {
 
     await announce.close()
     await dfd.promise
+  })
+
+  it('Calling close() more than once should be a no-op', () => {
+    const announce = new Announce('memory://')
+
+    expect(announce.close()).toBe(announce.close())
   })
 })
