@@ -1,6 +1,6 @@
 import { Deferred } from 'ts-deferred'
-import { getConcurrency } from '../selectors'
 import { BackendSubscriber, Message } from '../types'
+import { createMessage, getCompleteMessage, getConcurrency } from '../util'
 import { InMemoryBackend } from './InMemoryBackend'
 
 describe('In memory backend', () => {
@@ -11,11 +11,10 @@ describe('In memory backend', () => {
       topics: ['foo.bar'],
       handle: (message) => dfd.resolve(message)
     }
-    const message: Message<Buffer> = {
-      headers: { id: 'abcd', published: new Date().toISOString() },
+    const message = getCompleteMessage({
       topic: 'foo.bar',
       body: Buffer.from('hi there')
-    }
+    })
 
     const inMemory = new InMemoryBackend()
     inMemory.subscribe(subscriber)
@@ -49,11 +48,10 @@ describe('In memory backend', () => {
           receivedMessage = true
         }
       }
-      const message: Message<Buffer> = {
-        headers: { id: 'abcd', published: new Date().toISOString() },
+      const message = getCompleteMessage({
         topic,
         body: Buffer.from('hi there')
-      }
+      })
 
       const inMemory = new InMemoryBackend()
       inMemory.subscribe(subscriber)
@@ -90,15 +88,14 @@ describe('In memory backend', () => {
       },
       options: { concurrency: 2 }
     }
-    const message: Omit<Message<Buffer>, 'body'> = {
-      headers: { id: 'abcd', published: new Date().toISOString() },
-      topic: 'foo'
-    }
+    const message = createMessage('foo', null)
     const inMemory = new InMemoryBackend()
-    inMemory.subscribe(subscriber)
+    await inMemory.subscribe(subscriber)
 
     dfds.forEach((_, seq) =>
-      inMemory.publish({ ...message, body: Buffer.from(String(seq)) })
+      inMemory.publish(
+        getCompleteMessage({ ...message, body: Buffer.from(String(seq)) })
+      )
     )
     await done
 

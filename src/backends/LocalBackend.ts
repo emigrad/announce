@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
 import PromiseQueue from 'promise-queue'
-import { getConcurrency } from '../selectors'
 import { Backend, BackendSubscriber, Message, Subscriber } from '../types'
+import { getConcurrency } from '../util'
 
 export interface SubscriberWithQueue extends BackendSubscriber {
   queue: PromiseQueue

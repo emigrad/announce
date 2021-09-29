@@ -1,5 +1,6 @@
 import { Announce } from '../Announce'
-import { Logger, Message, MiddlewareInstance, Subscriber } from '../types'
+import { Logger, MiddlewareInstance, Subscriber } from '../types'
+import { getCompleteMessage } from '../util'
 import { log } from './log'
 
 describe('Logger middleware', () => {
@@ -20,7 +21,11 @@ describe('Logger middleware', () => {
     [false, 'error'],
     [true, 'trace']
   ])('Should log publishes (success: %p)', async (succeeded, level) => {
-    const message = { topic: 'abc', headers: { id: '33' } } as Message<any>
+    const message = getCompleteMessage({
+      topic: 'abc',
+      body: null,
+      headers: { id: '33' }
+    })
     let next
 
     if (succeeded) {
@@ -65,7 +70,11 @@ describe('Logger middleware', () => {
     [true, 'trace']
   ])('Should log messages (success: %p)', async (succeeded, level) => {
     const subscriber = { name: 'abc' } as Subscriber<any>
-    const message = { topic: 'abc', headers: { id: '33' } } as Message<any>
+    const message = getCompleteMessage({
+      topic: 'abc',
+      body: null,
+      properties: { id: '33' }
+    })
     let next
 
     if (succeeded) {

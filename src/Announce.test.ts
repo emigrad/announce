@@ -1,7 +1,7 @@
 import { Deferred } from 'ts-deferred'
 import { Announce } from './Announce'
 import { InMemoryBackend } from './backends'
-import { getCompleteHeaders } from './message'
+import { getCompleteMessage } from './util'
 import { jsonSerializer, log } from './middleware'
 import { Logger, Message, Subscriber } from './types'
 
@@ -35,11 +35,7 @@ describe('Announce', () => {
       })
 
       await expect(
-        announce.publish({
-          body: { hi: 'there' },
-          headers: getCompleteHeaders(),
-          topic
-        })
+        announce.publish(getCompleteMessage({ body: { hi: 'there' }, topic }))
       ).rejects.toBeDefined()
       expect(backend.publish).not.toHaveBeenCalled()
     }
@@ -62,11 +58,9 @@ describe('Announce', () => {
     announce.use(log(logger))
 
     await announce.subscribe(subscriber)
-    await announce.publish({
-      topic: 'foo',
-      body: Buffer.from('hi there'),
-      headers: getCompleteHeaders()
-    })
+    await announce.publish(
+      getCompleteMessage({ topic: 'foo', body: Buffer.from('hi there') })
+    )
 
     await dfd.promise
   })

@@ -1,6 +1,6 @@
 import { Announce } from '../Announce'
-import { getHeader } from '../selectors'
 import { Message, Subscriber } from '../types'
+import { getCompleteMessage, getHeader } from '../util'
 import { jsonSerializer } from './jsonSerializer'
 
 describe('JSONSerializer', () => {
@@ -41,11 +41,11 @@ describe('JSONSerializer', () => {
     const nextResult = '55'
     const next = jest.fn().mockResolvedValue(nextResult)
     const body = { hi: 'there' }
-    const message = {
-      body: Buffer.from(JSON.stringify(body)),
+    const message = getCompleteMessage({
       topic: 'fred',
-      headers: { id: '3', published: 'ff', 'content-type': 'application/json' }
-    } as Message<any>
+      body: Buffer.from(JSON.stringify(body)),
+      headers: { 'content-type': 'application/json' }
+    })
 
     expect(await serializer.handle!({ message, next, subscriber })).toBe(
       nextResult
@@ -58,11 +58,11 @@ describe('JSONSerializer', () => {
     async (contentType) => {
       const nextResult = '55'
       const next = jest.fn().mockResolvedValue(nextResult)
-      const message = {
-        body: Buffer.from('1234'),
+      const message = getCompleteMessage({
         topic: 'fred',
-        headers: { id: '3', published: 'ff', 'content-type': contentType }
-      } as Message<any>
+        body: Buffer.from('1234'),
+        headers: { 'content-type': contentType as string }
+      })
 
       expect(await serializer.handle!({ message, next, subscriber })).toBe(
         nextResult

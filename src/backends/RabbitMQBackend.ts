@@ -1,7 +1,12 @@
 import { Channel, ConfirmChannel, connect, Connection } from 'amqplib'
 import { ConsumeMessage, Options } from 'amqplib/properties'
 import { EventEmitter } from 'events'
-import { getConcurrency, hasDeadLetterQueue } from '../selectors'
+import {
+  getConcurrency,
+  getDeadLetterQueue,
+  getHeader,
+  hasDeadLetterQueue
+} from '../util'
 import { Backend, BackendSubscriber, Message, Subscriber } from '../types'
 
 export interface RabbitMQOptions {
@@ -51,15 +56,22 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
 
   async publish(message: Message<Buffer>): Promise<void> {
     const publishChannel = await this.getPublishChannel()
-    const { id: messageId, published, ...headers } = message.headers
-    const timestamp = Math.floor(+new Date(published) / 1000)
+    const messageId = message.properties.id
+    const timestamp = Math.floor(+message.properties.publishedAt / 1000)
 
     return new Promise((resolve, reject) => {
       publishChannel.publish(
         this.exchange,
         message.topic,
         message.body,
-        { headers, timestamp, messageId, persistent: true },
+        {
+          headers: message.headers,
+          timestamp,
+          messageId,
+          contentType: getHeader(message, 'content-type'),
+          contentEncoding: getHeader(message, 'content-encoding'),
+          persistent: true
+        },
         (err) => {
           if (err) {
             reject(err)
@@ -249,22 +261,37 @@ function getQueueOptions(subscriber: Subscriber<Buffer>): Options.AssertQueue {
 
   if (hasDeadLetterQueue(subscriber)) {
     options.deadLetterExchange = ''
-    options.deadLetterRoutingKey = `~dlq-${subscriber.name}`
+    options.deadLetterRoutingKey = getDeadLetterQueue(subscriber)!
   }
 
   return options
 }
 
-function convertMessage(message: ConsumeMessage): Message<Buffer> {
-  return {
-    topic: message.fields.routingKey,
-    headers: {
-      ...(message.properties.headers as Record<string, string>),
-      id: message.properties.messageId,
-      published: new Date(message.properties.timestamp * 1000).toISOString()
+function convertMessage(amqpMessage: ConsumeMessage): Message<Buffer> {
+  const message = {
+    topic: amqpMessage.fields.routingKey,
+    headers: amqpMessage.properties.headers as Record<string, string>,
+    properties: {
+      id: amqpMessage.properties.messageId,
+      publishedAt: new Date(amqpMessage.properties.timestamp * 1000)
     },
-    body: message.content
+    body: amqpMessage.content
   }
+
+  if (
+    amqpMessage.properties.contentType &&
+    getHeader(message, 'content-type') === undefined
+  ) {
+    message.headers['Content-Type'] = amqpMessage.properties.contentType
+  }
+  if (
+    amqpMessage.properties.contentEncoding &&
+    getHeader(message, 'content-encoding') === undefined
+  ) {
+    message.headers['Content-Encoding'] = amqpMessage.properties.contentEncoding
+  }
+
+  return message
 }
 
 /**

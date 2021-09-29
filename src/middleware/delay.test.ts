@@ -1,5 +1,6 @@
 import { Announce } from '../Announce'
-import { Message, Subscriber } from '../types'
+import { Subscriber } from '../types'
+import { getCompleteMessage } from '../util'
 import { delay, withDelay } from './delay'
 
 jest.useFakeTimers()
@@ -38,14 +39,11 @@ describe('delay middware', () => {
     async (elapsed) => {
       const delayMs = 750
       const delayMiddleware = delay({ delay: delayMs })(announce)
-      const message: Message<any> = {
+      const message = getCompleteMessage({
         topic: 'abc',
-        body: {},
-        headers: {
-          id: '123',
-          published: new Date(Date.now() - elapsed).toISOString()
-        }
-      }
+        body: null,
+        properties: { publishedAt: new Date(Date.now() - elapsed) }
+      })
       let handlerCalled = false
       let promiseResolved = false
       const subscriber = {
@@ -96,14 +94,8 @@ describe('delay middware', () => {
       expect(event).toBe('close')
       listener = _listener
     }) as any
-    const message: Message<any> = {
-      topic: 'abc',
-      body: {},
-      headers: {
-        id: '123',
-        published: new Date().toISOString()
-      }
-    }
+    const message = getCompleteMessage({ topic: 'abc', body: {} })
+
     let handlerCalled = false
     const subscriber = {
       name: 'fred',
@@ -144,7 +136,7 @@ describe('delay middware', () => {
     const promises: Promise<void>[] = []
     for (let i = 0; i < numMessages; i++) {
       promises.push(
-        subscriber.handle({ body: 'abc', headers: {} } as Message<any>, {
+        subscriber.handle(getCompleteMessage({ topic: 'abc', body: 'abc' }), {
           announce
         })
       )

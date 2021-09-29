@@ -8,7 +8,7 @@ import {
 } from 'fs'
 import { resolve } from 'path'
 import { promisify } from 'util'
-import { getDeadLetterQueue, hasDeadLetterQueue } from '../selectors'
+import { getDeadLetterQueue, hasDeadLetterQueue } from '../util'
 import { BackendSubscriber, Message, Subscriber } from '../types'
 import { LocalBackend, SubscriberWithQueue } from './LocalBackend'
 
@@ -115,6 +115,9 @@ export class FileBackend extends LocalBackend {
     const rawMessage = await readFile(path, 'utf8')
 
     const parsedMessage = JSON.parse(rawMessage) as Message<string>
+    parsedMessage.properties.publishedAt = new Date(
+      parsedMessage.properties.publishedAt
+    )
     return { ...parsedMessage, body: Buffer.from(parsedMessage.body, 'base64') }
   }
 

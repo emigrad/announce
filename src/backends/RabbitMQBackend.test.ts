@@ -3,6 +3,7 @@ import cuid from 'cuid'
 import { config } from 'dotenv-flow'
 import { Deferred } from 'ts-deferred'
 import { BackendSubscriber, Headers } from '../types'
+import { createMessage, getCompleteMessage } from '../util'
 import { RabbitMQBackend } from './RabbitMQBackend'
 
 config({ silent: true, purge_dotenv: true })
@@ -40,12 +41,14 @@ describe('RabbitMQ Backend', () => {
   it('Should be able to process messages', async () => {
     const dfd = new Deferred()
     const topic = 'test.test1'
-    const headers: Headers = {
-      id: cuid(),
-      published: '2020-01-02T18:19:20.000Z',
-      header1: 'Test'
-    }
-    const body = Buffer.from('hi there')
+    const message = createMessage(
+      topic,
+      Buffer.from('hi there'),
+      { header1: 'Test' },
+      {
+        publishedAt: new Date('2020-01-02T18:19:20.000Z')
+      }
+    )
     const subscriber: BackendSubscriber = {
       name: queueName,
       topics: ['test.*'],
@@ -55,9 +58,9 @@ describe('RabbitMQ Backend', () => {
     }
 
     await rabbitMq.subscribe(subscriber)
-    await rabbitMq.publish({ body, headers, topic })
+    await rabbitMq.publish(getCompleteMessage(message))
 
-    expect(await dfd.promise).toMatchObject({ body, headers })
+    expect(await dfd.promise).toMatchObject(message)
   })
 
   it('Should only process relevant messages', async () => {
@@ -68,11 +71,6 @@ describe('RabbitMQ Backend', () => {
 
     const dfd1 = new Deferred<Buffer>()
     const dfd2 = new Deferred<Buffer>()
-    const headers: Headers = {
-      id: cuid(),
-      published: '2020-01-02T18:19:20.000Z',
-      header1: 'Test'
-    }
     const subscriber1: BackendSubscriber = {
       name: queueName1,
       topics: ['test.test1'],
@@ -91,16 +89,12 @@ describe('RabbitMQ Backend', () => {
     await rabbitMq.subscribe(subscriber1)
     await rabbitMq.subscribe(subscriber2)
 
-    await rabbitMq.publish({
-      body: Buffer.from('1'),
-      headers,
-      topic: 'test.test1'
-    })
-    await rabbitMq.publish({
-      body: Buffer.from('2'),
-      headers,
-      topic: 'test.test2'
-    })
+    await rabbitMq.publish(
+      getCompleteMessage({ topic: 'test.test1', body: Buffer.from('1') })
+    )
+    await rabbitMq.publish(
+      getCompleteMessage({ topic: 'test.test2', body: Buffer.from('2') })
+    )
 
     expect((await dfd1.promise).toString()).toBe('1')
     expect((await dfd2.promise).toString()).toBe('2')
@@ -127,7 +121,9 @@ describe('RabbitMQ Backend', () => {
       await channel.deleteQueue(dlq)
 
       await rabbitMq.subscribe(subscriber)
-      await rabbitMq.publish({ body: Buffer.from(''), headers, topic })
+      await rabbitMq.publish(
+        getCompleteMessage({ topic, body: Buffer.from(''), headers })
+      )
 
       if (enableDlq === true || enableDlq === undefined) {
         const dfd = new Deferred()
@@ -168,7 +164,9 @@ describe('RabbitMQ Backend', () => {
     await rabbitMq.subscribe(subscriber)
 
     for (let i = 0; i < numMessages; i++) {
-      await rabbitMq.publish({ body: Buffer.from(''), headers, topic })
+      await rabbitMq.publish(
+        getCompleteMessage({ topic, body: Buffer.from(''), headers })
+      )
     }
 
     await dfd.promise
@@ -190,7 +188,7 @@ describe('RabbitMQ Backend', () => {
     const headers: Headers = { id: cuid(), published: new Date().toISOString() }
     const body = Buffer.from('')
 
-    await rabbitMq.publish({ body, headers, topic })
+    await rabbitMq.publish(getCompleteMessage({ topic, body, headers }))
   })
 
   it('Should handle publish errors', async () => {
@@ -198,13 +196,13 @@ describe('RabbitMQ Backend', () => {
     const headers: Headers = { id: cuid(), published: new Date().toISOString() }
     const body = Buffer.from('')
 
-    await rabbitMq.publish({ body, headers, topic })
+    await rabbitMq.publish(getCompleteMessage({ topic, body, headers }))
 
     const publishChannel = await (rabbitMq as any).publishChannel
     await publishChannel.close()
 
     await expect(
-      rabbitMq.publish({ body, headers, topic })
+      rabbitMq.publish(getCompleteMessage({ topic, body, headers }))
     ).rejects.toBeDefined()
   })
 
@@ -234,11 +232,12 @@ describe('RabbitMQ Backend', () => {
     rabbitMq.on('error', (err) => dfd.resolve(err))
 
     await expect(
-      rabbitMq.publish({
-        body: Buffer.from(''),
-        headers: { id: '1', published: new Date().toString() },
-        topic: String(Math.random())
-      })
+      rabbitMq.publish(
+        getCompleteMessage({
+          topic: String(Math.random()),
+          body: Buffer.from('')
+        })
+      )
     ).rejects.toBeDefined()
     await dfd.promise
   })
@@ -248,11 +247,12 @@ describe('RabbitMQ Backend', () => {
     const error = new Error()
 
     rabbitMq.on('error', (err) => dfd.resolve(err))
-    await rabbitMq.publish({
-      body: Buffer.from(''),
-      headers: { id: '1', published: new Date().toString() },
-      topic: String(Math.random())
-    })
+    await rabbitMq.publish(
+      getCompleteMessage({
+        topic: String(Math.random()),
+        body: Buffer.from('')
+      })
+    )
 
     const connection = await (rabbitMq as any).connection
     connection.emit('error', error)

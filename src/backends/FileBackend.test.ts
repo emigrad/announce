@@ -5,6 +5,7 @@ import rimrafCb from 'rimraf'
 import { Deferred } from 'ts-deferred'
 import { promisify } from 'util'
 import { BackendSubscriber, Message } from '../types'
+import { createMessage, getCompleteMessage } from '../util'
 import { FileBackend } from './FileBackend'
 
 const rimraf = promisify(rimrafCb)
@@ -30,11 +31,10 @@ describe('File backend', () => {
       topics: ['foo.bar'],
       handle: (message) => dfd.resolve(message)
     }
-    const message: Message<Buffer> = {
-      headers: { id: 'abcd', published: new Date().toISOString() },
+    const message = getCompleteMessage({
       topic: 'foo.bar',
       body: Buffer.from('hi there')
-    }
+    })
 
     await fileBackend.subscribe(subscriber)
     await fileBackend.publish(message)
@@ -68,14 +68,10 @@ describe('File backend', () => {
           receivedMessage = true
         }
       }
-      const message: Message<Buffer> = {
-        headers: { id: 'abcd', published: new Date().toISOString() },
-        topic,
-        body: Buffer.from('hi there')
-      }
+      const message = createMessage(topic, Buffer.from('hi there'))
 
       await fileBackend.subscribe(subscriber)
-      await fileBackend.publish(message)
+      await fileBackend.publish(getCompleteMessage(message))
 
       expect(receivedMessage).toBe(expected)
     }
@@ -108,14 +104,13 @@ describe('File backend', () => {
       },
       options: { concurrency: 2 }
     }
-    const message: Omit<Message<{}>, 'body'> = {
-      headers: { id: 'abcd', published: new Date().toISOString() },
-      topic: 'foo'
-    }
+    const message = createMessage('foo', null)
     await fileBackend.subscribe(subscriber)
 
     dfds.forEach((_, seq) =>
-      fileBackend.publish({ ...message, body: Buffer.from(String(seq)) })
+      fileBackend.publish(
+        getCompleteMessage({ ...message, body: Buffer.from(String(seq)) })
+      )
     )
     await done
 
@@ -134,15 +129,11 @@ describe('File backend', () => {
       topics: ['foo.bar'],
       handle: () => dfd.resolve()
     }
-    const message: Message<Buffer> = {
-      headers: { id: 'abcd', published: new Date().toISOString() },
-      topic: 'foo.bar',
-      body: Buffer.from('hi there')
-    }
+    const message = createMessage('foo.bar', Buffer.from('hi there'))
 
     const fileBackend1 = new FileBackend(path)
     await fileBackend1.subscribe(subscriber1)
-    await fileBackend1.publish(message)
+    await fileBackend1.publish(getCompleteMessage(message))
 
     const fileBackend2 = new FileBackend(path)
     await fileBackend2.subscribe(subscriber2)
@@ -162,11 +153,10 @@ describe('File backend', () => {
         dfd.resolve()
       }
     }
-    const message: Message<Buffer> = {
-      headers: { id: 'abcd', published: new Date().toISOString() },
+    const message = getCompleteMessage({
       topic: 'foo.bar',
       body: Buffer.from('hi there')
-    }
+    })
 
     const fileBackend1 = new FileBackend(path)
     await fileBackend1.subscribe(subscriber)
@@ -198,11 +188,10 @@ describe('File backend', () => {
         topics: [],
         handle: () => dlqSubscriberDfd.resolve()
       }
-      const message: Message<Buffer> = {
-        headers: { id: 'abcd', published: new Date().toISOString() },
+      const message = getCompleteMessage({
         topic: 'foo.bar',
         body: Buffer.from('hi there')
-      }
+      })
 
       await fileBackend.subscribe(subscriber)
 

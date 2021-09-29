@@ -1,4 +1,4 @@
-import { getHeader } from '../selectors'
+import { getHeader } from '../util'
 import { Middleware } from '../types'
 
 export const jsonSerializer: () => Middleware = () => () => ({

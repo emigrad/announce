@@ -1,6 +1,5 @@
 import { EventEmitter } from 'events'
 import { BackendFactory } from './backends'
-import { getCompleteHeaders } from './message'
 import {
   Backend,
   Message,
@@ -9,6 +8,7 @@ import {
   PublishMessage,
   Subscriber
 } from './types'
+import { getCompleteMessage } from './util'
 
 export interface AnnounceOptions {
   backendFactory?: Pick<BackendFactory, 'getBackend'>
@@ -76,11 +76,13 @@ export class Announce extends EventEmitter {
     return this._subscribe({ ...subscriber }, this.middlewares)
   }
 
-  publish(message: PublishMessage<any>): Promise<void> {
-    return this._publish(
-      { ...message, headers: getCompleteHeaders({ ...message.headers }) },
-      this.middlewares
-    )
+  async publish<Body extends any>(
+    message: PublishMessage<Body>
+  ): Promise<Message<Body>> {
+    const completeMessage = getCompleteMessage(message)
+    await this._publish(completeMessage, this.middlewares)
+
+    return completeMessage
   }
 
   async close() {
