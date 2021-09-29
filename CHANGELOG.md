@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.2.0](https://gitlab.com/emigrad/announce/compare/v0.1.1...v0.2.0) (2021-09-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* move message ID and publish date to separate field
+* change middleware signature
+* change subscribe() to not accept middlewares
+
+### Features
+
+* add delay middleware ([bfef07c](https://gitlab.com/emigrad/announce/commit/bfef07c8248a7a1ec13cb50ed1ef2713244fad52))
+* change middleware signature ([34bf877](https://gitlab.com/emigrad/announce/commit/34bf8773f69c4b5cdca07637954555b4c5c26668))
+* emit close() event once closed ([a41bf06](https://gitlab.com/emigrad/announce/commit/a41bf064909ab8e6f4dbc47911b91154b95b87d5))
+* move message ID and publish date to separate field ([7dfea3e](https://gitlab.com/emigrad/announce/commit/7dfea3e6c1fda989ea5618fe563d91ab4b817846))
+* support subscriber-specific middleware with with() ([e201187](https://gitlab.com/emigrad/announce/commit/e2011870e4ad43508df6de315fa085afaf003cd4))
+
+
+* change subscribe() to not accept middlewares ([1f7e144](https://gitlab.com/emigrad/announce/commit/1f7e144eba9bd638032ead5378511faf8a1a8148))
+
 ### [0.1.1](https://gitlab.com/emigrad/announce/compare/v0.1.0...v0.1.1) (2021-09-26)
 
 
