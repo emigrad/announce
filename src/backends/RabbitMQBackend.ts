@@ -1,5 +1,6 @@
 import { Channel, ConfirmChannel, connect, Connection } from 'amqplib'
 import { ConsumeMessage, Options } from 'amqplib/properties'
+import cuid from 'cuid'
 import { EventEmitter } from 'events'
 import {
   getConcurrency,
@@ -8,6 +9,8 @@ import {
   hasDeadLetterQueue
 } from '../util'
 import { Backend, BackendSubscriber, Message, Subscriber } from '../types'
+
+const dateHeader = 'x-announce-date'
 
 export interface RabbitMQOptions {
   exchange?: string
@@ -65,7 +68,10 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
         message.topic,
         message.body,
         {
-          headers: message.headers,
+          headers: {
+            [dateHeader]: message.properties.date.toISOString(),
+            ...message.headers
+          },
           timestamp,
           messageId,
           contentType: getHeader(message, 'content-type'),
@@ -272,8 +278,13 @@ function convertMessage(amqpMessage: ConsumeMessage): Message<Buffer> {
     topic: amqpMessage.fields.routingKey,
     headers: amqpMessage.properties.headers as Record<string, string>,
     properties: {
-      id: amqpMessage.properties.messageId,
-      date: new Date(amqpMessage.properties.timestamp * 1000)
+      id: amqpMessage.properties.messageId ?? cuid(),
+      date: new Date(
+        amqpMessage.properties.headers[dateHeader] ??
+          (amqpMessage.properties.timestamp != null
+            ? amqpMessage.properties.timestamp * 1000
+            : Date.now())
+      )
     },
     body: amqpMessage.content
   }

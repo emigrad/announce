@@ -1,7 +1,7 @@
 import { Channel, connect, Connection } from 'amqplib'
 import { config } from 'dotenv-flow'
 import { Deferred } from 'ts-deferred'
-import { BackendSubscriber } from '../types'
+import { BackendSubscriber, Message } from '../types'
 import { createMessage, getCompleteMessage } from '../util'
 import { RabbitMQBackend } from './RabbitMQBackend'
 
@@ -45,7 +45,7 @@ describe('RabbitMQ Backend', () => {
       Buffer.from('hi there'),
       { header1: 'Test' },
       {
-        date: new Date('2020-01-02T18:19:20.000Z')
+        date: new Date('2020-01-02T18:19:20.123Z')
       }
     )
     const subscriber: BackendSubscriber = {
@@ -247,6 +247,48 @@ describe('RabbitMQ Backend', () => {
     connection.emit('error', error)
 
     expect(await dfd.promise).toBe(error)
+  })
+
+  it("Should generate a message ID if it's missing", async () => {
+    const dfd = new Deferred<Message<Buffer>>()
+    await rabbitMq.subscribe({
+      name: queueName,
+      topics: [],
+      handle: dfd.resolve
+    })
+    channel.publish('', queueName, Buffer.from(''))
+    const receivedMessage = await dfd.promise
+
+    expect(receivedMessage.properties.id).toBeDefined()
+  })
+
+  it('Should fall back on the message timestamp if the date header is undefined', async () => {
+    const dfd = new Deferred<Message<Buffer>>()
+    const date = new Date('2020-04-06 12:34:56.000Z')
+    await rabbitMq.subscribe({
+      name: queueName,
+      topics: [],
+      handle: dfd.resolve
+    })
+    channel.publish('', queueName, Buffer.from(''), { timestamp: +date / 1000 })
+    const receivedMessage = await dfd.promise
+
+    expect(receivedMessage.properties.date).toEqual(date)
+  })
+
+  it('Should fall back on Date.now() if the message is completely undated', async () => {
+    const dfd = new Deferred<Message<Buffer>>()
+    const start = Date.now()
+    await rabbitMq.subscribe({
+      name: queueName,
+      topics: [],
+      handle: dfd.resolve
+    })
+    channel.publish('', queueName, Buffer.from(''))
+    const receivedMessage = await dfd.promise
+
+    expect(+receivedMessage.properties.date).toBeGreaterThanOrEqual(start)
+    expect(+receivedMessage.properties.date).toBeLessThanOrEqual(Date.now())
   })
 })
 
