@@ -1,8 +1,9 @@
 import { Channel, connect, Connection } from 'amqplib'
+import { ConsumeMessage } from 'amqplib/properties'
 import { config } from 'dotenv-flow'
 import { Deferred } from 'ts-deferred'
 import { BackendSubscriber, Message } from '../types'
-import { createMessage, getCompleteMessage } from '../util'
+import { createMessage, getCompleteMessage, getHeader } from '../util'
 import { RabbitMQBackend } from './RabbitMQBackend'
 
 config({ silent: true, purge_dotenv: true })
@@ -290,6 +291,72 @@ describe('RabbitMQ Backend', () => {
     expect(+receivedMessage.properties.date).toBeGreaterThanOrEqual(start)
     expect(+receivedMessage.properties.date).toBeLessThanOrEqual(Date.now())
   })
+
+  it('Should set the contentType and contentEncoding properties from the headers', async () => {
+    const dfd = new Deferred<ConsumeMessage | null>()
+    const testQueueName = `${queueName}.${Math.random()}`
+    const contentType = 'foo'
+    const contentEncoding = 'bar'
+
+    await channel.assertQueue(testQueueName, {
+      durable: false,
+      autoDelete: true
+    })
+    await channel.bindQueue(testQueueName, exchange, testQueueName)
+    await channel.consume(testQueueName, dfd.resolve)
+
+    await rabbitMq.publish(
+      getCompleteMessage({
+        topic: testQueueName,
+        body: Buffer.from(''),
+        headers: {
+          'Content-Type': contentType,
+          'Content-Encoding': contentEncoding
+        }
+      })
+    )
+
+    const receivedMessage = (await dfd.promise)!
+
+    expect(receivedMessage.properties).toMatchObject({
+      contentType,
+      contentEncoding
+    })
+  })
+
+  it.each([
+    ['Content-Type', false],
+    ['Content-Type', false],
+    ['Content-Encoding', true],
+    ['Content-Encoding', false]
+  ])(
+    "Should set the %p header from the property if it's not already defined",
+    async (header, alreadyDefined) => {
+      const dfd = new Deferred<Message<Buffer>>()
+      await rabbitMq.subscribe({
+        name: queueName,
+        topics: [],
+        handle: dfd.resolve
+      })
+      const headerValue = 'header value'
+      const propertyValue = 'property value'
+      const headers: Record<string, string> = {}
+      if (alreadyDefined) {
+        headers[header] = headerValue
+      }
+
+      channel.publish('', queueName, Buffer.from(''), {
+        headers,
+        [header === 'Content-Type' ? 'contentType' : 'contentEncoding']:
+          propertyValue
+      })
+      const receivedMessage = await dfd.promise
+
+      expect(getHeader(receivedMessage, header)).toBe(
+        alreadyDefined ? headerValue : propertyValue
+      )
+    }
+  )
 })
 
 function squelch() {}
