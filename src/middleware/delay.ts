@@ -58,7 +58,7 @@ export const withDelay: SubscriberWrapper<[DelayArgs], any> = (
    * being sent and us receiving it
    */
   function getDelay(message: Message<any>): number {
-    const elapsed = Date.now() - +message.properties.publishedAt
+    const elapsed = Date.now() - +message.properties.date
     const actualDelay = Math.max(
       0,
       delayMs + (Math.random() - 0.5) * variation * delayMs

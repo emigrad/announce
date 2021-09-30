@@ -57,7 +57,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
   async publish(message: Message<Buffer>): Promise<void> {
     const publishChannel = await this.getPublishChannel()
     const messageId = message.properties.id
-    const timestamp = Math.floor(+message.properties.publishedAt / 1000)
+    const timestamp = Math.floor(+message.properties.date / 1000)
 
     return new Promise((resolve, reject) => {
       publishChannel.publish(
@@ -268,12 +268,12 @@ function getQueueOptions(subscriber: Subscriber<Buffer>): Options.AssertQueue {
 }
 
 function convertMessage(amqpMessage: ConsumeMessage): Message<Buffer> {
-  const message = {
+  const message: Message<Buffer> = {
     topic: amqpMessage.fields.routingKey,
     headers: amqpMessage.properties.headers as Record<string, string>,
     properties: {
       id: amqpMessage.properties.messageId,
-      publishedAt: new Date(amqpMessage.properties.timestamp * 1000)
+      date: new Date(amqpMessage.properties.timestamp * 1000)
     },
     body: amqpMessage.content
   }

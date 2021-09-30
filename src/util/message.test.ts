@@ -10,7 +10,7 @@ describe('Message utils', () => {
   const topic = 'fred'
   const body = { hi: 'there' }
   const headers = { 'Content-Type': 'blah' }
-  const properties = { id: '123', publishedAt: new Date() }
+  const properties = { id: '123', date: new Date() }
   const subscriber: Subscriber<any> = {
     name: 'blah',
     topics: ['*'],
@@ -44,9 +44,9 @@ describe('Message utils', () => {
       properties
     })
     expect(getCompleteMessage({ topic, body }).properties.id).toBeDefined()
-    expect(
-      getCompleteMessage({ topic, body }).properties.publishedAt
-    ).toBeInstanceOf(Date)
+    expect(getCompleteMessage({ topic, body }).properties.date).toBeInstanceOf(
+      Date
+    )
   })
 
   test.each([true, false, undefined])('hasDeadLetterQueue() (%p)', (value) => {

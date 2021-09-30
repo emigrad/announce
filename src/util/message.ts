@@ -40,7 +40,7 @@ export function getCompleteProperties(
 ): MessageProperties {
   return {
     id: cuid(),
-    publishedAt: new Date(),
+    date: new Date(),
     ...properties
   }
 }

@@ -19,5 +19,5 @@ export interface MessageProperties {
   /** The message's unique ID */
   id: string
   /** When the message was published */
-  publishedAt: Date
+  date: Date
 }

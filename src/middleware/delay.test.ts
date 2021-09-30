@@ -42,7 +42,7 @@ describe('delay middware', () => {
       const message = getCompleteMessage({
         topic: 'abc',
         body: null,
-        properties: { publishedAt: new Date(Date.now() - elapsed) }
+        properties: { date: new Date(Date.now() - elapsed) }
       })
       let handlerCalled = false
       let promiseResolved = false

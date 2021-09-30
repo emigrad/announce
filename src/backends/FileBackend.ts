@@ -115,9 +115,7 @@ export class FileBackend extends LocalBackend {
     const rawMessage = await readFile(path, 'utf8')
 
     const parsedMessage = JSON.parse(rawMessage) as Message<string>
-    parsedMessage.properties.publishedAt = new Date(
-      parsedMessage.properties.publishedAt
-    )
+    parsedMessage.properties.date = new Date(parsedMessage.properties.date)
     return { ...parsedMessage, body: Buffer.from(parsedMessage.body, 'base64') }
   }
 

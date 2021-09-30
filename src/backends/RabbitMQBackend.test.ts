@@ -45,7 +45,7 @@ describe('RabbitMQ Backend', () => {
       Buffer.from('hi there'),
       { header1: 'Test' },
       {
-        publishedAt: new Date('2020-01-02T18:19:20.000Z')
+        date: new Date('2020-01-02T18:19:20.000Z')
       }
     )
     const subscriber: BackendSubscriber = {
