@@ -357,6 +357,96 @@ describe('RabbitMQ Backend', () => {
       )
     }
   )
+
+  it('Should rebuild the channel when a null message is received', async () => {
+    const topic = 'test'
+    const dfds = [new Deferred(), new Deferred(), new Deferred()]
+    const closedDfd = new Deferred()
+
+    // Force the backend to create the channel
+    await rabbitMq.subscribe(createSubscriber(0))
+    const subscribeChannel = (await Object.values(
+      (rabbitMq as any).subscriberChannels
+    )[0]) as Channel
+
+    const consumeSpy = jest.spyOn(subscribeChannel, 'consume')
+    const origClose = subscribeChannel.close
+
+    subscribeChannel.close = jest.fn(async () => {
+      await origClose.call(subscribeChannel)
+      closedDfd.resolve()
+    }) as any
+    const closeSpy = jest.spyOn(subscribeChannel, 'close')
+
+    // Add two more subscribers - we're going to send null messages to them both
+    await rabbitMq.subscribe(createSubscriber(1))
+    await rabbitMq.subscribe(createSubscriber(2))
+
+    const consumers = consumeSpy.mock.calls.map(([_, consumer]) => consumer)
+    consumers.forEach((consumer) => consumer(null))
+
+    await closedDfd.promise
+    expect(closeSpy).toHaveBeenCalledTimes(1)
+
+    // Since the channel has been closed, we will only receive the messages
+    // if it's rebuilt
+    channel.publish(exchange, topic, Buffer.from(''))
+    await Promise.all(dfds.map(({ promise }) => promise))
+
+    // Messages can sometimes be received before the channel-creation promise
+    // is resolved, which can cause the test to complete before the backend
+    // has had a chance to complete its rebuild. We create a new subscriber
+    // to ensure that the rebuild completes and there aren't any errors thrown
+    await rabbitMq.subscribe(createSubscriber(4))
+
+    function createSubscriber(idx: number): BackendSubscriber {
+      return {
+        name: queueName + idx,
+        topics: [topic],
+        handle: () => dfds[idx].resolve()
+      }
+    }
+  })
+
+  it("Should not rebuild the channel when we're closing", async () => {
+    const topic = 'test'
+    const dfds = [new Deferred(), new Deferred(), new Deferred()]
+    const closedDfd = new Deferred()
+
+    // Force the backend to create the channel
+    await rabbitMq.subscribe(createSubscriber(0))
+    const subscribeChannel = (await Object.values(
+      (rabbitMq as any).subscriberChannels
+    )[0]) as Channel
+
+    const consumeSpy = jest.spyOn(subscribeChannel, 'consume')
+    const origClose = subscribeChannel.close
+
+    subscribeChannel.close = jest.fn(async () => {
+      await origClose.call(subscribeChannel)
+      closedDfd.resolve()
+    }) as any
+    const closeSpy = jest.spyOn(subscribeChannel, 'close')
+
+    // Add two more subscribers - we're going to send null messages to them both
+    await rabbitMq.subscribe(createSubscriber(1))
+    await rabbitMq.subscribe(createSubscriber(2))
+
+    const consumers = consumeSpy.mock.calls.map(([_, consumer]) => consumer)
+    const closePromise = rabbitMq.close()
+    consumers.forEach((consumer) => consumer(null))
+
+    await closePromise
+    expect(closeSpy).not.toHaveBeenCalled()
+
+    function createSubscriber(idx: number): BackendSubscriber {
+      return {
+        name: queueName + idx,
+        topics: [topic],
+        handle: () => dfds[idx].resolve()
+      }
+    }
+  })
 })
 
 function squelch() {}

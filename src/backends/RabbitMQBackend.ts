@@ -161,7 +161,10 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
 
       try {
         // Note that we don't attempt to redefine the queues; if they're
-        // deleted then this will fail
+        // deleted then this will fail. Also it doesn't matter if a new
+        // subscriber is added between us deleting the channel and recreating
+        // it - we'll just use the channel that add operation created instead
+        // of creating our own
         await Promise.all(
           this.getSubscribersWithConcurrency(concurrency).map((subscriber) =>
             this.consume(subscriber)
