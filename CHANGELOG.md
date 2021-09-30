@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.3.0](https://gitlab.com/emigrad/announce/compare/v0.2.0...v0.3.0) (2021-09-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* rename publishedAt to date
+* rename PublishMessage to UnpublishedMessage
+
+### Features
+
+* dates for messages sent over RabbitMQ now have millisecond precision ([d9dc432](https://gitlab.com/emigrad/announce/commit/d9dc43206657544f30e6957816d313c69932199d))
+* rename publishedAt to date ([954c9c6](https://gitlab.com/emigrad/announce/commit/954c9c6899d0b3767d882deaf0ddf07677fe60f4))
+* rename PublishMessage to UnpublishedMessage ([d0b960b](https://gitlab.com/emigrad/announce/commit/d0b960b4344a09b17f092f72cbd9493bedb8a494))
+
 ## [0.2.0](https://gitlab.com/emigrad/announce/compare/v0.1.1...v0.2.0) (2021-09-29)
 
 
