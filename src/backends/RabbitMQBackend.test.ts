@@ -1,8 +1,7 @@
 import { Channel, connect, Connection } from 'amqplib'
-import cuid from 'cuid'
 import { config } from 'dotenv-flow'
 import { Deferred } from 'ts-deferred'
-import { BackendSubscriber, Headers } from '../types'
+import { BackendSubscriber } from '../types'
 import { createMessage, getCompleteMessage } from '../util'
 import { RabbitMQBackend } from './RabbitMQBackend'
 
@@ -104,10 +103,6 @@ describe('RabbitMQ Backend', () => {
     'Should honour DLQ setting (%p)',
     async (enableDlq) => {
       const topic = 'test.test1'
-      const headers: Headers = {
-        id: cuid(),
-        published: new Date().toISOString()
-      }
       const subscriber: BackendSubscriber = {
         name: queueName,
         topics: [topic],
@@ -122,7 +117,7 @@ describe('RabbitMQ Backend', () => {
 
       await rabbitMq.subscribe(subscriber)
       await rabbitMq.publish(
-        getCompleteMessage({ topic, body: Buffer.from(''), headers })
+        getCompleteMessage({ topic, body: Buffer.from('') })
       )
 
       if (enableDlq === true || enableDlq === undefined) {
@@ -142,10 +137,6 @@ describe('RabbitMQ Backend', () => {
     const concurrency = 3
     const numMessages = 5
     const delay = 50
-    const headers: Headers = {
-      id: cuid(),
-      published: '2020-01-02T18:19:20.000Z'
-    }
     const receivedMessageTimes: number[] = []
     const subscriber: BackendSubscriber = {
       name: queueName,
@@ -165,7 +156,7 @@ describe('RabbitMQ Backend', () => {
 
     for (let i = 0; i < numMessages; i++) {
       await rabbitMq.publish(
-        getCompleteMessage({ topic, body: Buffer.from(''), headers })
+        getCompleteMessage({ topic, body: Buffer.from('') })
       )
     }
 
@@ -185,24 +176,22 @@ describe('RabbitMQ Backend', () => {
 
   it('publish() should still succeed even if there are no consumers', async () => {
     const topic = String(Math.random())
-    const headers: Headers = { id: cuid(), published: new Date().toISOString() }
     const body = Buffer.from('')
 
-    await rabbitMq.publish(getCompleteMessage({ topic, body, headers }))
+    await rabbitMq.publish(getCompleteMessage({ topic, body }))
   })
 
   it('Should handle publish errors', async () => {
     const topic = String(Math.random())
-    const headers: Headers = { id: cuid(), published: new Date().toISOString() }
     const body = Buffer.from('')
 
-    await rabbitMq.publish(getCompleteMessage({ topic, body, headers }))
+    await rabbitMq.publish(getCompleteMessage({ topic, body }))
 
     const publishChannel = await (rabbitMq as any).publishChannel
     await publishChannel.close()
 
     await expect(
-      rabbitMq.publish(getCompleteMessage({ topic, body, headers }))
+      rabbitMq.publish(getCompleteMessage({ topic, body }))
     ).rejects.toBeDefined()
   })
 
