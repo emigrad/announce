@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.3.1](https://gitlab.com/emigrad/announce/compare/v0.3.0...v0.3.1) (2021-09-30)
+
+
+### Bug Fixes
+
+* fix package entrypoint ([44d50c8](https://gitlab.com/emigrad/announce/commit/44d50c8921ef7cc1282a635318d63a37c8edcd5c))
+
 ## [0.3.0](https://gitlab.com/emigrad/announce/compare/v0.2.0...v0.3.0) (2021-09-30)
 
 
