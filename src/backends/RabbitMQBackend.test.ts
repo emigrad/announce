@@ -1,4 +1,4 @@
-import { Channel, connect, Connection } from 'amqplib'
+import { Channel, ConfirmChannel, connect, Connection } from 'amqplib'
 import { ConsumeMessage } from 'amqplib/properties'
 import { config } from 'dotenv-flow'
 import { Deferred } from 'ts-deferred'
@@ -446,6 +446,30 @@ describe('RabbitMQ Backend', () => {
         handle: () => dfds[idx].resolve()
       }
     }
+  })
+
+  it('Should reject the promise if a publish fails', async () => {
+    const error = new Error()
+
+    // Create the publish channel
+    await rabbitMq.publish(
+      getCompleteMessage({ topic: 'hi', body: Buffer.from('') })
+    )
+    const publishChannel = (await (rabbitMq as any)
+      .publishChannel)! as ConfirmChannel
+    publishChannel.publish = jest.fn(
+      (_: any, __: any, ___: any, ____: any, callback: (err: any) => {}) => {
+        callback(error)
+
+        return true
+      }
+    )
+
+    await expect(
+      rabbitMq.publish(
+        getCompleteMessage({ topic: 'hi', body: Buffer.from('') })
+      )
+    ).rejects.toBe(error)
   })
 })
 
