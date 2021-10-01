@@ -50,7 +50,6 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     this.on('error', () => this.close())
     this.connection.then(
       (connection) => {
-        ensureCleanShutdown(connection)
         connection.on('error', (err) => this.emit('error', err))
       },
       (err) => this.emit('error', err)
@@ -306,32 +305,4 @@ function convertMessage(amqpMessage: ConsumeMessage): Message<Buffer> {
   }
 
   return message
-}
-
-/**
- * It's possible for an error to cause the AMQP connection with the server to
- * close, but the underlying TCP connection stays alive (if we don't receive
- * a TCP ACK reply to our FIN packet). This function ensures that the TCP
- * connection is always fully destroyed so that we don't end up with dangling
- * Node handles keeping the process alive
- */
-export function ensureCleanShutdown(connection: Connection) {
-  const stream = (connection as any).connection?.stream
-  let destroyTimeout: NodeJS.Timeout
-
-  if (!stream) {
-    throw new Error('Unable to patch amqplib')
-  }
-
-  stream.on('close', streamClosed)
-  connection.on('close', connectionClosed)
-
-  function connectionClosed() {
-    destroyTimeout = setTimeout(() => stream.destroy(), 1000)
-  }
-
-  function streamClosed() {
-    connection.removeListener('close', connectionClosed)
-    clearTimeout(destroyTimeout)
-  }
 }

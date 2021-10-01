@@ -458,8 +458,14 @@ describe('RabbitMQ Backend', () => {
     const publishChannel = (await (rabbitMq as any)
       .publishChannel)! as ConfirmChannel
     publishChannel.publish = jest.fn(
-      (_: any, __: any, ___: any, ____: any, callback: (err: any) => {}) => {
-        callback(error)
+      (
+        _: any,
+        __: any,
+        ___: any,
+        ____: any,
+        callback: (err: any, ok: any) => void
+      ) => {
+        callback(error, null)
 
         return true
       }
