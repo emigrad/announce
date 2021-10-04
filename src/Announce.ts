@@ -70,19 +70,27 @@ export class Announce extends EventEmitter {
     return copy.use(...middlewares)
   }
 
-  subscribe<Body extends any = any>(
-    subscriber: Subscriber<Body>
+  async subscribe<Body extends any = any>(
+    ...subscribers: Subscriber<Body>[]
   ): Promise<void> {
-    return this._subscribe({ ...subscriber }, this.middlewares)
+    await Promise.all(
+      subscribers.map((subscriber) =>
+        this._subscribe({ ...subscriber }, this.middlewares)
+      )
+    )
   }
 
-  async publish<Body extends any>(
-    message: UnpublishedMessage<Body>
-  ): Promise<Message<Body>> {
-    const completeMessage = getCompleteMessage(message)
-    await this._publish(completeMessage, this.middlewares)
+  async publish<Body extends any = any>(
+    ...messages: UnpublishedMessage<Body>[]
+  ): Promise<Message<Body>[]> {
+    return Promise.all(
+      messages.map(async (message) => {
+        const completeMessage = getCompleteMessage(message)
+        await this._publish(completeMessage, this.middlewares)
 
-    return completeMessage
+        return completeMessage
+      })
+    )
   }
 
   close() {

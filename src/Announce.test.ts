@@ -12,7 +12,7 @@ describe('Announce', () => {
 
   it.each(['***', ' hello', '..foo', '.bar', 'bar.', 'something-else'])(
     'Should reject subscribers that listen to invalid topic %p',
-    (topic) => {
+    async (topic) => {
       const subscriber: Subscriber<any> = {
         name: 'test',
         topics: [topic],
@@ -20,7 +20,7 @@ describe('Announce', () => {
       }
       const announce = new Announce('memory://')
 
-      expect(() => announce.subscribe(subscriber)).toThrow()
+      await expect(announce.subscribe(subscriber)).rejects.toBeDefined()
     }
   )
 
