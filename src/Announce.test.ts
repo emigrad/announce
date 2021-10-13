@@ -1,7 +1,7 @@
 import { Deferred } from 'ts-deferred'
 import { Announce } from './Announce'
 import { InMemoryBackend } from './backends'
-import { getCompleteMessage } from './util'
+import { createMessage, getCompleteMessage } from './util'
 import { jsonSerializer, log } from './middleware'
 import { Logger, Message, Subscriber } from './types'
 
@@ -233,4 +233,29 @@ describe('Announce', () => {
 
     expect(announce.close()).toBe(announce.close())
   })
+
+  it('Should correctly handle subscribers that are class instances', async () => {
+    const subscriber = new TestSubscriber()
+    const announce = new Announce('memory://')
+    const body = Buffer.from('hi there')
+    await announce.subscribe(subscriber)
+
+    await announce.publish(createMessage(subscriber.topics[0], body))
+
+    expect(await subscriber.dfd.promise).toMatchObject({ body })
+  })
 })
+
+class TestSubscriber implements Subscriber<Buffer> {
+  topics = ['test.test']
+  name = 'test'
+  dfd: Deferred<any>
+
+  constructor() {
+    this.dfd = new Deferred()
+  }
+
+  handle(message: Message<Buffer>) {
+    this.dfd.resolve(message)
+  }
+}

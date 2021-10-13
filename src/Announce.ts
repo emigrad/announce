@@ -75,7 +75,7 @@ export class Announce extends EventEmitter {
   ): Promise<void> {
     await Promise.all(
       subscribers.map((subscriber) =>
-        this._subscribe({ ...subscriber }, this.middlewares)
+        this._subscribe(cloneSubscriber(subscriber), this.middlewares)
       )
     )
   }
@@ -194,5 +194,19 @@ function validateMessage(message: Message<any>) {
     throw new Error(`Invalid topic: ${message.topic}`)
   } else if (!(message.body instanceof Buffer)) {
     throw new Error('Message body must be a Buffer')
+  }
+}
+
+/**
+ * Clones a subscriber so that we work correctly with subscribers where
+ * one or more properties exists in the object's prototype chain rather than
+ * on the object itself (eg subscribers that are classes)
+ */
+function cloneSubscriber(subscriber: Subscriber<any>): Subscriber<any> {
+  return {
+    name: subscriber.name,
+    topics: subscriber.topics,
+    options: subscriber.options,
+    handle: subscriber.handle.bind(subscriber)
   }
 }
