@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.4.0](https://gitlab.com/emigrad/announce/compare/v0.3.1...v0.4.0) (2021-10-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* Return type of Announce.publish() has changed
+
+### Features
+
+* publish() and subscribe() now accept multiple messages/subscribers ([cd21094](https://gitlab.com/emigrad/announce/commit/cd21094294d697bdffa61521df6719b0881089d5))
+
+
+### Bug Fixes
+
+* correctly handle subscribers that are instances of a class ([f560e7c](https://gitlab.com/emigrad/announce/commit/f560e7c1caf8c17b6ea5a38e91c1321b4b471973))
+
 ### [0.3.1](https://gitlab.com/emigrad/announce/compare/v0.3.0...v0.3.1) (2021-09-30)
 
 
