@@ -195,7 +195,11 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
 
     await Promise.all(
       subscriber.topics.map((topic) =>
-        channel.bindQueue(subscriber.name, this.exchange, topic)
+        channel.bindQueue(
+          subscriber.name,
+          this.exchange,
+          topic.replace(/\*/g, '#')
+        )
       )
     )
   }

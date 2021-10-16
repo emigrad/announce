@@ -45,7 +45,7 @@ describe('RabbitMQ Backend', () => {
 
   it('Should be able to process messages', async () => {
     const dfd = new Deferred()
-    const topic = 'test.test1'
+    const topic = 'test.test.test2'
     const message = createMessage(
       topic,
       Buffer.from('hi there'),
