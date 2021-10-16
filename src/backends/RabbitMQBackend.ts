@@ -223,7 +223,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
           if (ack) {
             channel.ack(message)
           } else {
-            channel.nack(message)
+            channel.nack(message, false, false)
           }
         } catch (e) {
           // Ignore errors when attempting to ack/nack the message since

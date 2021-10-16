@@ -3,7 +3,12 @@ import { ConsumeMessage } from 'amqplib/properties'
 import { config } from 'dotenv-flow'
 import { Deferred } from 'ts-deferred'
 import { BackendSubscriber, Message } from '../types'
-import { createMessage, getCompleteMessage, getHeader } from '../util'
+import {
+  createMessage,
+  getCompleteMessage,
+  getDeadLetterQueue,
+  getHeader
+} from '../util'
 import { RabbitMQBackend } from './RabbitMQBackend'
 
 config({ silent: true, purge_dotenv: true })
@@ -61,6 +66,43 @@ describe('RabbitMQ Backend', () => {
     await rabbitMq.publish(getCompleteMessage(message))
 
     expect(await dfd.promise).toMatchObject(message)
+  })
+
+  it('Rejected messages should be sent to the DLQ', async () => {
+    let counter = 0
+    const dfd = new Deferred()
+    const topic = 'test.test1'
+    const message = createMessage(
+      topic,
+      Buffer.from('hi there'),
+      { header1: 'Test' },
+      {
+        date: new Date('2020-01-02T18:19:20.123Z')
+      }
+    )
+    const subscriber: BackendSubscriber = {
+      name: queueName,
+      topics: ['test.*'],
+      async handle() {
+        counter++
+        throw new Error()
+      }
+    }
+    const dlqSubscriber: BackendSubscriber = {
+      name: getDeadLetterQueue(subscriber)!,
+      topics: [],
+      handle: dfd.resolve,
+      options: { deadLetterQueue: false }
+    }
+
+    await channel.deleteQueue(dlqSubscriber.name)
+
+    await rabbitMq.subscribe(subscriber)
+    await rabbitMq.subscribe(dlqSubscriber)
+    await rabbitMq.publish(getCompleteMessage(message))
+
+    expect(await dfd.promise).toMatchObject({ body: message.body })
+    expect(counter).toBe(1)
   })
 
   it('Should only process relevant messages', async () => {
