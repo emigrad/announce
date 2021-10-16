@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.1](https://gitlab.com/emigrad/announce/compare/v0.4.0...v0.4.1) (2021-10-16)
+
+
+### Bug Fixes
+
+* correctly send rejected messages to the DLQ ([f4fd8af](https://gitlab.com/emigrad/announce/commit/f4fd8af19b2209129740b85bd008fe02ea16217d))
+
 ## [0.4.0](https://gitlab.com/emigrad/announce/compare/v0.3.1...v0.4.0) (2021-10-13)
 
 
