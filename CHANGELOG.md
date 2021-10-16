@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.2](https://gitlab.com/emigrad/announce/compare/v0.4.1...v0.4.2) (2021-10-16)
+
+
+### Bug Fixes
+
+* correctly bind wildcard topics ([9739d52](https://gitlab.com/emigrad/announce/commit/9739d5214f78852410e474a251578270a7a010ca))
+
 ### [0.4.1](https://gitlab.com/emigrad/announce/compare/v0.4.0...v0.4.1) (2021-10-16)
 
 
