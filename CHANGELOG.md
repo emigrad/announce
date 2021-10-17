@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.3](https://gitlab.com/emigrad/announce/compare/v0.4.2...v0.4.3) (2021-10-17)
+
+
+### Bug Fixes
+
+* support amqps:// for rabbit connections ([afd0f86](https://gitlab.com/emigrad/announce/commit/afd0f865048c267e5b9cb1441a6514e5ed6d8e50))
+
 ### [0.4.2](https://gitlab.com/emigrad/announce/compare/v0.4.1...v0.4.2) (2021-10-16)
 
 
