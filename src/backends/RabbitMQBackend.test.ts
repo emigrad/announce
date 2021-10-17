@@ -43,6 +43,15 @@ describe('RabbitMQ Backend', () => {
 
   afterAll(() => connection.close())
 
+  it.each(['amqp', 'amqps', 'http'])(
+    'Should accept relevant protocols (%p)',
+    (protocol) => {
+      expect(RabbitMQBackend.accepts(`${protocol}://localhost`)).toBe(
+        protocol.startsWith('amqp')
+      )
+    }
+  )
+
   it('Should be able to process messages', async () => {
     const dfd = new Deferred()
     const topic = 'test.test.test2'

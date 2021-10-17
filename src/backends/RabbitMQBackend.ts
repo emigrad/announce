@@ -35,7 +35,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
   private closePromise: Promise<void> | undefined
 
   static accepts(url: string) {
-    return url.startsWith('amqp://')
+    return /^amqps?:\/\//.test(url)
   }
 
   constructor(url: string, { exchange = 'events' }: RabbitMQOptions = {}) {
