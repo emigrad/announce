@@ -4,17 +4,16 @@ export const log: (logger: Logger) => Middleware = (logger) => () => ({
   async publish({ message, next }): Promise<void> {
     try {
       await next(message)
-      logger.trace(
-        `Published message ${message.headers.id} to ${message.topic}`
-      )
-    } catch (error) {
-      logger.error(
-        `Error publishing message ${message.headers.id} to ${message.topic}`,
-        {
-          error
-        }
-      )
-      throw error
+      logger.trace({
+        msg: `Published message ${message.headers.id} to ${message.topic}`
+      })
+    } catch (err) {
+      logger.error({
+        err,
+        msg: `Error publishing message ${message.headers.id} to ${message.topic}`
+      })
+
+      throw err
     }
   },
 
@@ -24,12 +23,9 @@ export const log: (logger: Logger) => Middleware = (logger) => () => ({
     try {
       await next(subscriber)
 
-      logger.info(`Subscribed ${subscriber.name}`, details)
+      logger.info({ ...details, msg: `Subscribed ${subscriber.name}` })
     } catch (error) {
-      logger.error(`Failed subscribing ${subscriber.name}`, {
-        ...details,
-        error
-      })
+      logger.error({ ...details, msg: `Failed subscribing ${subscriber.name}` })
 
       throw error
     }
@@ -44,18 +40,19 @@ export const log: (logger: Logger) => Middleware = (logger) => () => ({
     }
     try {
       await next(message)
-      logger.trace(`Handled message for ${subscriber.name}`, {
+      logger.trace({
         ...details,
-        duration: Date.now() - start
+        msg: `Handled message for ${subscriber.name}`
       })
-    } catch (error) {
-      logger.error(`Error handling message for ${subscriber.name}`, {
+    } catch (err) {
+      logger.error({
         ...details,
+        err,
         duration: Date.now() - start,
-        error
+        msg: `Error handling message for ${subscriber.name}`
       })
 
-      throw error
+      throw err
     }
   }
 })
