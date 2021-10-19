@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.4](https://gitlab.com/emigrad/announce/compare/v0.4.3...v0.4.4) (2021-10-19)
+
+
+### Bug Fixes
+
+* compatibility fix for pino/bunyan loggers ([f578412](https://gitlab.com/emigrad/announce/commit/f57841236ab93010eddf80908625bfe5cc7a7627))
+
 ### [0.4.3](https://gitlab.com/emigrad/announce/compare/v0.4.2...v0.4.3) (2021-10-17)
 
 
