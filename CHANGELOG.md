@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.5](https://gitlab.com/emigrad/announce/compare/v0.4.4...v0.4.5) (2021-10-30)
+
+
+### Bug Fixes
+
+* type declation of subscribe() ([7cd7cb5](https://gitlab.com/emigrad/announce/commit/7cd7cb59aeb25041ca4d9c6572976a70e6f4590e))
+
 ### [0.4.4](https://gitlab.com/emigrad/announce/compare/v0.4.3...v0.4.4) (2021-10-19)
 
 
