@@ -70,9 +70,7 @@ export class Announce extends EventEmitter {
     return copy.use(...middlewares)
   }
 
-  async subscribe<Body extends any = any>(
-    ...subscribers: Subscriber<Body>[]
-  ): Promise<void> {
+  async subscribe(...subscribers: Subscriber<any>[]): Promise<void> {
     await Promise.all(
       subscribers.map((subscriber) =>
         this._subscribe(cloneSubscriber(subscriber), this.middlewares)
