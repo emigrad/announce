@@ -26,7 +26,8 @@
   "dependencies": {
     "amqplib": "^0.8.0",
     "cuid": "^2.1.8",
-    "promise-queue": "^2.2.5"
+    "promise-queue": "^2.2.5",
+    "rambda": "^6.9.0"
   },
   "devDependencies": {
     "@babel/core": "^7.14.3",

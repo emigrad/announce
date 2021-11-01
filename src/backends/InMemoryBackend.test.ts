@@ -101,4 +101,45 @@ describe('In memory backend', () => {
 
     expect(maxRunning).toBe(subscriber.options?.concurrency)
   })
+
+  it('Multiple consumers with the same name should all receive messages', async () => {
+    const dfds = [new Deferred(), new Deferred(), new Deferred()]
+    const subscribers = dfds.map((_, idx) => createSubscriber(idx))
+    const messagesReceivedBySubscriberId = subscribers.map(() => 0)
+    const messagesReceivedByMessageId: number[] = []
+    const done = Promise.all(dfds.map(({ promise }) => promise))
+
+    const inMemory = new InMemoryBackend()
+
+    await Promise.all(
+      subscribers.map((subscriber) => inMemory.subscribe(subscriber))
+    )
+
+    for (let i = 0; i < subscribers.length; i++) {
+      messagesReceivedByMessageId[i] = 0
+      await inMemory.publish(
+        getCompleteMessage(createMessage('foo', Buffer.from(String(i))))
+      )
+    }
+
+    await done
+
+    expect(messagesReceivedBySubscriberId.every((count) => count > 0))
+    expect(messagesReceivedByMessageId.every((count) => count <= 1))
+
+    function createSubscriber(subscriberId: number): BackendSubscriber {
+      return {
+        name: 'test',
+        topics: ['foo'],
+        handle({ body }) {
+          const messageId = +body.toString()
+          messagesReceivedByMessageId[messageId]++
+          messagesReceivedBySubscriberId[subscriberId]++
+          dfds[subscriberId].resolve()
+
+          return new Promise(() => {})
+        }
+      }
+    }
+  })
 })

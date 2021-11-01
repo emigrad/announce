@@ -1,5 +1,7 @@
 import { EventEmitter } from 'events'
 import PromiseQueue from 'promise-queue'
+import { groupBy } from 'rambda'
+import { prop } from 'rambda/immutable'
 import { Backend, BackendSubscriber, Message, Subscriber } from '../types'
 import { getConcurrency } from '../util'
 
@@ -30,7 +32,14 @@ export abstract class LocalBackend extends EventEmitter implements Backend {
   protected getMatchingSubscribers({
     topic
   }: Message<Buffer>): SubscriberWithQueue[] {
-    return this.subscribers.filter(subscribesTo(topic))
+    const matchingSubscribers = this.subscribers.filter(subscribesTo(topic))
+    // Where there are multiple subscribers with the same name, only one
+    // should receive each message
+    const subscribersByName = groupBy(prop('name'), matchingSubscribers)
+
+    return Object.values(subscribersByName).map(
+      getSubscriberWithFewestUnprocessedMessages
+    )
   }
 }
 
@@ -49,4 +58,24 @@ function getTopicSelectorRegExp(topicSelector: string): RegExp {
     .replace(/\*\*?/g, (match) => (match === '**' ? '.*' : '[^.]+'))
 
   return new RegExp(`^${regExpStr}$`)
+}
+
+function getSubscriberWithFewestUnprocessedMessages(
+  subscribers: readonly SubscriberWithQueue[]
+): SubscriberWithQueue {
+  let bestSubscriber = subscribers[0]
+
+  subscribers.forEach((subscriber) => {
+    // By adding Math.random(), where multiple subscribers have the
+    // same number of unprocessed messages, we will randomly distribute
+    // the messages between them rather than always choosing the first
+    if (
+      subscriber.queue.getPendingLength() + Math.random() <
+      bestSubscriber.queue.getPendingLength() + Math.random()
+    ) {
+      bestSubscriber = subscriber
+    }
+  })
+
+  return bestSubscriber
 }
