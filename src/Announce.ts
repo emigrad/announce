@@ -168,11 +168,13 @@ export class Announce extends EventEmitter {
 }
 
 function isValidTopic(topic: string) {
-  return /^[0-9A-Z_]+(\.[0-9A-Z_]+)*$/i.test(topic)
+  return /^[0-9A-Z_~]+(\.[0-9A-Z_~]+)*$/i.test(topic)
 }
 
 function isValidTopicSelector(topicSelector: string) {
-  return /^(\*|\*\*|[A-Z0-9_]+)(\.(\*|\*\*|[A-Z0-9_]+))*$/i.test(topicSelector)
+  return /^(\*|\*\*|[A-Z0-9_~]+)(\.(\*|\*\*|[A-Z0-9_~]+))*$/i.test(
+    topicSelector
+  )
 }
 
 /**

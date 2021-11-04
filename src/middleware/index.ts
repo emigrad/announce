@@ -1,3 +1,5 @@
 export * from './delay'
 export * from './jsonSerializer'
 export * from './log'
+export * from './retry'
+export * from './spy'
