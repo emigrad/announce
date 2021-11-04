@@ -10,7 +10,6 @@ describe('Logger middleware', () => {
 
   beforeEach(() => {
     logger = {
-      trace: jest.fn(),
       info: jest.fn(),
       error: jest.fn()
     }
@@ -19,7 +18,7 @@ describe('Logger middleware', () => {
 
   it.each([
     [false, 'error'],
-    [true, 'trace']
+    [true, 'info']
   ])('Should log publishes (success: %p)', async (succeeded, level) => {
     const message = getCompleteMessage({
       topic: 'abc',
@@ -67,7 +66,7 @@ describe('Logger middleware', () => {
 
   it.each([
     [false, 'error'],
-    [true, 'trace']
+    [true, 'info']
   ])('Should log messages (success: %p)', async (succeeded, level) => {
     const subscriber = { name: 'abc' } as Subscriber<any>
     const message = getCompleteMessage({

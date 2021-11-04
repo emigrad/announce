@@ -1,58 +1,67 @@
-import { Logger, Middleware } from '../types'
+import { Logger, Message, Middleware } from '../types'
+import { spy } from './spy'
 
-export const log: (logger: Logger) => Middleware = (logger) => () => ({
-  async publish({ message, next }): Promise<void> {
-    try {
-      await next(message)
-      logger.trace({
-        msg: `Published message ${message.headers.id} to ${message.topic}`
+const START_HEADER = 'x-log-start'
+
+export const log: (logger: Logger) => Middleware = (logger) => {
+  return spy({
+    onPublish({ message }) {
+      logger.info({
+        messageId: message.properties.id,
+        msg: `Published message ${message.properties.id} to ${message.topic}`
       })
-    } catch (err) {
+    },
+
+    onPublishError({ message, error }) {
       logger.error({
-        err,
-        msg: `Error publishing message ${message.headers.id} to ${message.topic}`
+        messageId: message.properties.id,
+        err: error,
+        msg: `Error publishing message ${message.properties.id} to ${message.topic}`
       })
+    },
 
-      throw err
-    }
-  },
+    onSubscribe({ subscriber }) {
+      logger.info({
+        msg: `Subscribed ${subscriber.name}`,
+        topics: subscriber.topics,
+        name: subscriber.name
+      })
+    },
 
-  async subscribe({ subscriber, next }): Promise<void> {
-    const details = { topics: subscriber.topics, options: subscriber.options }
+    onSubscribeError({ error, subscriber }) {
+      logger.error({
+        topics: subscriber.topics,
+        name: subscriber.name,
+        msg: `Failed subscribing ${subscriber.name}`,
+        err: error
+      })
+    },
 
-    try {
-      await next(subscriber)
+    beforeHandle({ message }) {
+      message.headers[START_HEADER] = new Date().toISOString()
+    },
 
-      logger.info({ ...details, msg: `Subscribed ${subscriber.name}` })
-    } catch (error) {
-      logger.error({ ...details, msg: `Failed subscribing ${subscriber.name}` })
-
-      throw error
-    }
-  },
-
-  async handle({ message, next, subscriber }): Promise<void> {
-    const start = Date.now()
-    const details = {
-      subscriber: subscriber.name,
-      topic: message.topic,
-      messageId: message.headers.id
-    }
-    try {
-      await next(message)
-      logger.trace({
-        ...details,
+    onHandle({ message, subscriber }) {
+      logger.info({
+        messageId: message.properties.id,
+        duration: getDuration(message),
+        topic: message.topic,
         msg: `Handled message for ${subscriber.name}`
       })
-    } catch (err) {
-      logger.error({
-        ...details,
-        err,
-        duration: Date.now() - start,
-        msg: `Error handling message for ${subscriber.name}`
-      })
+    },
 
-      throw err
+    onHandleError({ error, message, subscriber }) {
+      logger.error({
+        messageId: message.properties.id,
+        duration: getDuration(message),
+        topic: message.topic,
+        err: error,
+        msg: `Error handling message for ${subscriber.name}: ${error}`
+      })
     }
-  }
-})
+  })
+}
+
+function getDuration(message: Message<any>): number {
+  return Date.now() - +new Date(message.headers[START_HEADER])
+}

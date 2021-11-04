@@ -159,6 +159,16 @@ await delayedAnnounce.subscribe({
 
 This is a list of the middlewares provided by Announce. See [Writing middleware](#writing-middleware) below for details on how to write your own
 
+## log()
+
+`log()` logs subscriptions, publishes, processed messages and errors. Most loggers are supported, eg Winston, Bunyan and Pino, however this middleware uses the `msg` property for the log message, whereas some loggers such as Winston use `message`. If this is the case for your logger, you may wish to use a wrapper or write your own logging middleware using [spy()](#spy) (see [log.ts](./src/middleware/log.ts) for an example of how to do this).
+
+### Options
+
+* `logger`: (required) The logger. log() will work with any logger that provides the following interface: `{info: (details: {msg: string}) => any, error: (details: {msg: string, error: any})`. 
+
+Source: [log.ts](./src/middleware/log.ts)
+
 ## retry()
 
 `retry()` helps your application automatically recover from temporary failures, for example an unreachable server or overloaded database. If a message is rejected, it will wait a while before attempting to process the message again. It will wait an exponentially-increasing amount of time each time a particular message fails, until eventually rejecting the message after a maximum number of attempts. 
@@ -170,8 +180,6 @@ This is a list of the middlewares provided by Announce. See [Writing middleware]
 * `variation`: How much to randomly vary the delay by to help mitigate the [thundering herd problem](https://en.wikipedia.org/wiki/Thundering_herd_problem). Changes the actual delay by a multiple of the computed delay (from `initialDelay` and `increaseFactor`, above). For example, if `initialDelay` is 1000, `increaseFactor` is 3, `variation` is 0.2 and this is the second attempt, the computed delay will be 1000ms * 3 * 3 = 9000ms, and the actual delay will be somewhere between 9000ms - (9000ms * 0.2) = 7200ms and 9000ms + (9000ms * 0.2) = 10800ms. Default: 0.1
 * `maxRetries`: The maximum number of times `delay()` will retry a message. Default: 5
 * `canRetry(error, message)`: If this function is provided and returns false, a message will not be retried. Use this to immediately reject messages that will never be successful, for example messages that have an invalid body. Default: retry all messages. 
-
-
 
 ### Developing with `retry()`
 
