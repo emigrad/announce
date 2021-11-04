@@ -1,11 +1,11 @@
 import { Announce } from '../Announce'
 import { Message, Subscriber } from '../types'
 import { getCompleteMessage, getHeader } from '../util'
-import { jsonSerializer } from './jsonSerializer'
+import { json } from './json'
 
-describe('JSONSerializer', () => {
+describe('json middleware', () => {
   const announce = {} as Announce
-  const serializer = jsonSerializer()(announce)
+  const serializer = json()(announce)
   const subscriber = {} as Subscriber<any>
 
   it('Should stringify messages that are not Buffers', async () => {

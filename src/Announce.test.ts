@@ -2,7 +2,7 @@ import { Deferred } from 'ts-deferred'
 import { Announce } from './Announce'
 import { InMemoryBackend } from './backends'
 import { createMessage, getCompleteMessage } from './util'
-import { jsonSerializer, log } from './middleware'
+import { json, log } from './middleware'
 import { Logger, Message, Subscriber } from './types'
 
 describe('Announce', () => {
@@ -69,7 +69,7 @@ describe('Announce', () => {
     const dfd = new Deferred()
     const announce = new Announce('memory://')
     const body = { hi: 'there' }
-    announce.use(jsonSerializer())
+    announce.use(json())
 
     await announce.subscribe({
       name: 'test',
@@ -165,7 +165,7 @@ describe('Announce', () => {
     }
     const announce = new Announce('memory://')
     announce.use(() => middleware)
-    const jsonAnnounce = announce.with(jsonSerializer())
+    const jsonAnnounce = announce.with(json())
     const message = { topic: 'blah', body: { hi: 'there' } }
 
     await announce.subscribe({
@@ -205,7 +205,7 @@ describe('Announce', () => {
       subscribe: jest.fn(({ subscriber, next }) => next(subscriber))
     }
     const announce = new Announce('memory://')
-    announce.use(jsonSerializer(), () => middleware)
+    announce.use(json(), () => middleware)
 
     await announce.subscribe({
       name: 'json',
@@ -222,7 +222,7 @@ describe('Announce', () => {
   it(`with()'ed instances should still emit events`, async () => {
     const dfd = new Deferred()
     const announce = new Announce('memory://')
-    announce.with(jsonSerializer()).on('close', dfd.resolve)
+    announce.with(json()).on('close', dfd.resolve)
 
     await announce.close()
     await dfd.promise

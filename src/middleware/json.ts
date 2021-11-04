@@ -1,7 +1,7 @@
 import { getHeader } from '../util'
 import { Middleware } from '../types'
 
-export const jsonSerializer: () => Middleware = () => () => ({
+export const json: () => Middleware = () => () => ({
   async publish({ message, next }): Promise<void> {
     const { body, headers } = message
 

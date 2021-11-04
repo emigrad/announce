@@ -36,7 +36,7 @@ An announce instance starts out as a blank slate - messages are sent and receive
 
 ```typescript
 // Add this at the top of the file 
-import { Announce, log, jsonSerializer } from '@emigrad/announce'
+import { Announce, log, json } from '@emigrad/announce'
 
 const announce = new Announce()
 
@@ -45,7 +45,7 @@ const announce = new Announce()
 announce.use(log(logger))
 
 // This allows us to send and receive any objects that can be serialised to JSON
-announce.use(jsonSerializer())
+announce.use(json())
 ```
 
 `logger` can be any logger that supports standard NPM log levels and accepts objects as log entries - this includes [Winston](https://www.npmjs.com/package/winston), [Bunyan](https://www.npmjs.com/package/bunyan) and [Pino](https://www.npmjs.com/package/pino). Now we have an instance that automatically serialises and deserialises to JSON, and logs any errors that occur. 
