@@ -185,7 +185,9 @@ function validateSubscriber(subscriber: Subscriber<any>) {
     (topic) => !isValidTopicSelector(topic)
   )
   if (invalidTopics.length) {
-    throw new Error(`Invalid topic selector(s): ${invalidTopics.join(', ')}`)
+    throw new Error(
+      `Invalid topic selector(s): ${invalidTopics.join(', ')}. Topic `
+    )
   }
 }
 
@@ -193,7 +195,9 @@ function validateMessage(message: Message<any>) {
   if (!isValidTopic(message.topic)) {
     throw new Error(`Invalid topic: ${message.topic}`)
   } else if (!(message.body instanceof Buffer)) {
-    throw new Error('Message body must be a Buffer')
+    throw new Error(
+      'Message body must be a Buffer. Consider using the json() middleware to automatically serialise and deserialise messages'
+    )
   }
 }
 
