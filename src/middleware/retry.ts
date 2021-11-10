@@ -74,12 +74,12 @@ export const retry = ({
       subscriber: Subscriber<any>,
       next: (subscriber: Subscriber<any>) => Promise<void>
     ) {
-      if (!initializedQueues.includes(subscriber.name)) {
+      if (!initializedQueues.includes(subscriber.queueName)) {
         for (let retry = 1; retry <= maxRetries; retry++) {
           await createRetryQueue(subscriber, retry, next)
         }
 
-        initializedQueues.push(subscriber.name)
+        initializedQueues.push(subscriber.queueName)
       }
     }
 
@@ -139,7 +139,7 @@ export const retry = ({
       const name = getRetryTopic(subscriber, retryNum)
 
       return {
-        name,
+        queueName: name,
         topics: [name],
         handle(message) {
           return announce.publish({
@@ -182,7 +182,7 @@ function getTopic(message: Message<any>): string {
  * Returns the topic to publish retry messages to
  */
 function getRetryTopic(subscriber: Subscriber<any>, retryNum: number) {
-  return `~retry.${subscriber.name}.${retryNum}`
+  return `~retry.${subscriber.queueName}.${retryNum}`
 }
 
 /**

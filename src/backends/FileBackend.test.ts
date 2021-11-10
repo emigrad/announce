@@ -27,7 +27,7 @@ describe('File backend', () => {
   it('Should publish and receive messages', async () => {
     const dfd = new Deferred<Message<Buffer>>()
     const subscriber: BackendSubscriber = {
-      name: 'test',
+      queueName: 'test',
       topics: ['foo.bar'],
       handle: (message) => dfd.resolve(message)
     }
@@ -62,7 +62,7 @@ describe('File backend', () => {
     async (selector, topic, expected) => {
       let receivedMessage = false
       const subscriber: BackendSubscriber = {
-        name: 'test',
+        queueName: 'test',
         topics: [selector],
         handle: () => {
           receivedMessage = true
@@ -91,7 +91,7 @@ describe('File backend', () => {
     const done = Promise.all(dfds.map(({ promise }) => promise))
 
     const subscriber: BackendSubscriber = {
-      name: 'test',
+      queueName: 'test',
       topics: ['foo'],
       handle: async ({ body }) => {
         expect(numRunning).toBeLessThan(subscriber.options?.concurrency!)
@@ -120,12 +120,12 @@ describe('File backend', () => {
   it('Should redeliver messages that did not complete processing', async () => {
     const dfd = new Deferred()
     const subscriber1: BackendSubscriber = {
-      name: 'test',
+      queueName: 'test',
       topics: ['foo.bar'],
       handle: () => new Promise(() => {})
     }
     const subscriber2: BackendSubscriber = {
-      name: 'test',
+      queueName: 'test',
       topics: ['foo.bar'],
       handle: () => dfd.resolve()
     }
@@ -146,7 +146,7 @@ describe('File backend', () => {
     const dfd = new Deferred()
     let handleCount = 0
     const subscriber: BackendSubscriber = {
-      name: 'test',
+      queueName: 'test',
       topics: ['foo.bar'],
       handle: () => {
         handleCount++
@@ -176,7 +176,7 @@ describe('File backend', () => {
       const subscriberDfd = new Deferred()
       const dlqSubscriberDfd = new Deferred()
       const subscriber: BackendSubscriber = {
-        name: 'test',
+        queueName: 'test',
         topics: ['foo.bar'],
         handle: () => {
           subscriberDfd.resolve()
@@ -184,7 +184,7 @@ describe('File backend', () => {
         }
       }
       const dlqSubscriber: BackendSubscriber = {
-        name: 'test.dlq',
+        queueName: 'test.dlq',
         topics: [],
         handle: () => dlqSubscriberDfd.resolve()
       }

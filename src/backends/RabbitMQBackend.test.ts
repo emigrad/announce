@@ -64,7 +64,7 @@ describe('RabbitMQ Backend', () => {
       }
     )
     const subscriber: BackendSubscriber = {
-      name: queueName,
+      queueName: queueName,
       topics: ['test.*'],
       async handle(message) {
         dfd.resolve(message)
@@ -90,7 +90,7 @@ describe('RabbitMQ Backend', () => {
       }
     )
     const subscriber: BackendSubscriber = {
-      name: queueName,
+      queueName: queueName,
       topics: ['test.*'],
       async handle() {
         counter++
@@ -98,13 +98,13 @@ describe('RabbitMQ Backend', () => {
       }
     }
     const dlqSubscriber: BackendSubscriber = {
-      name: getDeadLetterQueue(subscriber)!,
+      queueName: getDeadLetterQueue(subscriber)!,
       topics: [],
       handle: dfd.resolve,
       options: { deadLetterQueue: false }
     }
 
-    await channel.deleteQueue(dlqSubscriber.name)
+    await channel.deleteQueue(dlqSubscriber.queueName)
 
     await rabbitMq.subscribe(subscriber)
     await rabbitMq.subscribe(dlqSubscriber)
@@ -123,14 +123,14 @@ describe('RabbitMQ Backend', () => {
     const dfd1 = new Deferred<Buffer>()
     const dfd2 = new Deferred<Buffer>()
     const subscriber1: BackendSubscriber = {
-      name: queueName1,
+      queueName: queueName1,
       topics: ['test.test1'],
       async handle({ body }) {
         dfd1.resolve(body)
       }
     }
     const subscriber2: BackendSubscriber = {
-      name: queueName2,
+      queueName: queueName2,
       topics: ['test.test2'],
       async handle({ body }) {
         dfd2.resolve(body)
@@ -156,7 +156,7 @@ describe('RabbitMQ Backend', () => {
     async (enableDlq) => {
       const topic = 'test.test1'
       const subscriber: BackendSubscriber = {
-        name: queueName,
+        queueName: queueName,
         topics: [topic],
         options: { deadLetterQueue: enableDlq },
         async handle() {
@@ -164,7 +164,7 @@ describe('RabbitMQ Backend', () => {
         }
       }
 
-      const dlq = `~dlq-${subscriber.name}`
+      const dlq = `~dlq-${subscriber.queueName}`
       await channel.deleteQueue(dlq)
 
       await rabbitMq.subscribe(subscriber)
@@ -191,7 +191,7 @@ describe('RabbitMQ Backend', () => {
     const delay = 50
     const receivedMessageTimes: number[] = []
     const subscriber: BackendSubscriber = {
-      name: queueName,
+      queueName: queueName,
       topics: ['test.*'],
       options: { concurrency },
       async handle() {
@@ -250,7 +250,7 @@ describe('RabbitMQ Backend', () => {
   it('Should emit error if queue deleted', async () => {
     const dfd = new Deferred()
     const subscriber: BackendSubscriber = {
-      name: queueName,
+      queueName: queueName,
       topics: ['test.*'],
       async handle(message) {
         dfd.resolve(message)
@@ -260,7 +260,7 @@ describe('RabbitMQ Backend', () => {
     await rabbitMq.subscribe(subscriber)
     rabbitMq.on('error', (error) => dfd.resolve(error))
 
-    await channel.deleteQueue(subscriber.name)
+    await channel.deleteQueue(subscriber.queueName)
     await dfd.promise
   })
 
@@ -304,7 +304,7 @@ describe('RabbitMQ Backend', () => {
   it("Should generate a message ID if it's missing", async () => {
     const dfd = new Deferred<Message<Buffer>>()
     await rabbitMq.subscribe({
-      name: queueName,
+      queueName: queueName,
       topics: [],
       handle: dfd.resolve
     })
@@ -318,7 +318,7 @@ describe('RabbitMQ Backend', () => {
     const dfd = new Deferred<Message<Buffer>>()
     const date = new Date('2020-04-06 12:34:56.000Z')
     await rabbitMq.subscribe({
-      name: queueName,
+      queueName: queueName,
       topics: [],
       handle: dfd.resolve
     })
@@ -332,7 +332,7 @@ describe('RabbitMQ Backend', () => {
     const dfd = new Deferred<Message<Buffer>>()
     const start = Date.now()
     await rabbitMq.subscribe({
-      name: queueName,
+      queueName: queueName,
       topics: [],
       handle: dfd.resolve
     })
@@ -385,7 +385,7 @@ describe('RabbitMQ Backend', () => {
     async (header, alreadyDefined) => {
       const dfd = new Deferred<Message<Buffer>>()
       await rabbitMq.subscribe({
-        name: queueName,
+        queueName: queueName,
         topics: [],
         handle: dfd.resolve
       })
@@ -452,7 +452,7 @@ describe('RabbitMQ Backend', () => {
 
     function createSubscriber(idx: number): BackendSubscriber {
       return {
-        name: queueName + idx,
+        queueName: queueName + idx,
         topics: [topic],
         handle: () => dfds[idx].resolve()
       }
@@ -492,7 +492,7 @@ describe('RabbitMQ Backend', () => {
 
     function createSubscriber(idx: number): BackendSubscriber {
       return {
-        name: queueName + idx,
+        queueName: queueName + idx,
         topics: [topic],
         handle: () => dfds[idx].resolve()
       }

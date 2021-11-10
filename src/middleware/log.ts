@@ -22,17 +22,18 @@ export const log: (logger: Logger) => Middleware = (logger) => {
 
     onSubscribe({ subscriber }) {
       logger.info({
-        msg: `Subscribed ${subscriber.name}`,
+        msg: `Subscribed ${subscriber.queueName}`,
+        queueName: subscriber.queueName,
         topics: subscriber.topics,
-        name: subscriber.name
+        name: subscriber.queueName
       })
     },
 
     onSubscribeError({ error, subscriber }) {
       logger.error({
         topics: subscriber.topics,
-        name: subscriber.name,
-        msg: `Failed subscribing ${subscriber.name}`,
+        queueName: subscriber.queueName,
+        msg: `Failed subscribing ${subscriber.queueName}: ${error}`,
         err: error
       })
     },
@@ -46,7 +47,7 @@ export const log: (logger: Logger) => Middleware = (logger) => {
         messageId: message.properties.id,
         duration: getDuration(message),
         topic: message.topic,
-        msg: `Handled message for ${subscriber.name}`
+        msg: `Handled message for ${subscriber.queueName}`
       })
     },
 
@@ -56,7 +57,7 @@ export const log: (logger: Logger) => Middleware = (logger) => {
         duration: getDuration(message),
         topic: message.topic,
         err: error,
-        msg: `Error handling message for ${subscriber.name}: ${error}`
+        msg: `Error handling message for ${subscriber.queueName}: ${error}`
       })
     }
   })

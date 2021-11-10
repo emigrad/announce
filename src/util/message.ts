@@ -65,7 +65,7 @@ export function hasDeadLetterQueue(subscriber: Subscriber<any>): boolean {
  * it doesn't have one
  */
 export function getDeadLetterQueue(subscriber: Subscriber<any>): string | null {
-  return hasDeadLetterQueue(subscriber) ? `~dlq-${subscriber.name}` : null
+  return hasDeadLetterQueue(subscriber) ? `~dlq-${subscriber.queueName}` : null
 }
 
 /**

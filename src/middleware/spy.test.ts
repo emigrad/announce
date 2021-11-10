@@ -9,7 +9,7 @@ describe('spy middleware', () => {
     const beforeSubscribe = jest.fn()
     const onSubscribe = jest.fn()
     const subscriber: Subscriber<any> = {
-      name: 'test',
+      queueName: 'test',
       topics: ['test'],
       handle: () => {}
     }
@@ -22,7 +22,7 @@ describe('spy middleware', () => {
     expect(beforeSubscribe).toHaveBeenCalledWith(
       expect.objectContaining({
         subscriber: {
-          name: subscriber.name,
+          queueName: subscriber.queueName,
           topics: subscriber.topics,
           handle: expect.any(Function)
         },
@@ -32,7 +32,7 @@ describe('spy middleware', () => {
     expect(onSubscribe).toHaveBeenCalledWith(
       expect.objectContaining({
         subscriber: {
-          name: subscriber.name,
+          queueName: subscriber.queueName,
           topics: subscriber.topics,
           handle: expect.any(Function)
         },
@@ -45,7 +45,7 @@ describe('spy middleware', () => {
     const announce = new Announce('memory://')
     const onSubscribeError = jest.fn()
     const subscriber: Subscriber<any> = {
-      name: 'test',
+      queueName: 'test',
       topics: ['test'],
       handle: () => {}
     }
@@ -63,7 +63,7 @@ describe('spy middleware', () => {
     expect(onSubscribeError).toHaveBeenCalledWith(
       expect.objectContaining({
         subscriber: {
-          name: subscriber.name,
+          queueName: subscriber.queueName,
           topics: subscriber.topics,
           handle: expect.any(Function)
         },
@@ -110,7 +110,7 @@ describe('spy middleware', () => {
     const beforeHandle = jest.fn()
     const onHandle = jest.fn()
     const subscriber: Subscriber<any> = {
-      name: 'test',
+      queueName: 'test',
       topics: ['test'],
       handle: () => {}
     }
@@ -127,7 +127,7 @@ describe('spy middleware', () => {
     expect(beforeHandle).toHaveBeenCalledWith(
       expect.objectContaining({
         subscriber: {
-          name: subscriber.name,
+          queueName: subscriber.queueName,
           topics: subscriber.topics,
           handle: expect.any(Function)
         },
@@ -138,7 +138,7 @@ describe('spy middleware', () => {
     expect(onHandle).toHaveBeenCalledWith(
       expect.objectContaining({
         subscriber: {
-          name: subscriber.name,
+          queueName: subscriber.queueName,
           topics: subscriber.topics,
           handle: expect.any(Function)
         },
@@ -153,7 +153,7 @@ describe('spy middleware', () => {
     const onHandleError = jest.fn()
     const error = new Error('Oh no')
     const subscriber: Subscriber<any> = {
-      name: 'test',
+      queueName: 'test',
       topics: ['test'],
       handle: () => {
         throw error
@@ -172,7 +172,7 @@ describe('spy middleware', () => {
     expect(onHandleError).toHaveBeenCalledWith(
       expect.objectContaining({
         subscriber: {
-          name: subscriber.name,
+          queueName: subscriber.queueName,
           topics: subscriber.topics,
           handle: expect.any(Function)
         },

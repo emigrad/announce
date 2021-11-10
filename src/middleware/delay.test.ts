@@ -23,7 +23,7 @@ describe('delay middware', () => {
     const nextResult = '55'
     const next = jest.fn().mockResolvedValue(nextResult)
     const subscriber = {
-      name: 'fred',
+      queueName: 'fred',
       topics: ['abc'],
       options: { concurrency: 5 }
     } as Subscriber<any>
@@ -47,7 +47,7 @@ describe('delay middware', () => {
       let handlerCalled = false
       let promiseResolved = false
       const subscriber = {
-        name: 'fred',
+        queueName: 'fred',
         topics: ['abc'],
         handle: () => {
           handlerCalled = true
@@ -98,7 +98,7 @@ describe('delay middware', () => {
 
     let handlerCalled = false
     const subscriber = {
-      name: 'fred',
+      queueName: 'fred',
       topics: ['abc'],
       handle: () => {
         handlerCalled = true
@@ -128,7 +128,7 @@ describe('delay middware', () => {
     const expectedMinDelay = delayMs - (delayMs * variation) / 2
     const expectedMaxDelay = delayMs + (delayMs * variation) / 2
     const subscriber = withDelay(
-      { name: 'fred', topics: ['abc'], handle },
+      { queueName: 'fred', topics: ['abc'], handle },
       { delay: delayMs, variation }
     )
 

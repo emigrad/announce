@@ -208,7 +208,7 @@ function validateMessage(message: Message<any>) {
  */
 function cloneSubscriber(subscriber: Subscriber<any>): Subscriber<any> {
   return {
-    name: subscriber.name,
+    queueName: subscriber.queueName,
     topics: subscriber.topics,
     options: subscriber.options,
     handle: subscriber.handle.bind(subscriber)

@@ -14,7 +14,7 @@ describe('Announce', () => {
     'Should reject subscribers that listen to invalid topic %p',
     async (topic) => {
       const subscriber: Subscriber<any> = {
-        name: 'test',
+        queueName: 'test',
         topics: [topic],
         handle: jest.fn()
       }
@@ -45,7 +45,7 @@ describe('Announce', () => {
     const dfd = new Deferred<[string, Error]>()
     const error = new Error('no')
     const subscriber: Subscriber<any> = {
-      name: 'test',
+      queueName: 'test',
       topics: ['foo'],
       handle: jest.fn().mockRejectedValue(error)
     }
@@ -72,7 +72,7 @@ describe('Announce', () => {
     announce.use(json())
 
     await announce.subscribe({
-      name: 'test',
+      queueName: 'test',
       topics: ['test'],
       handle(message: Message<any>) {
         dfd.resolve(message)
@@ -169,12 +169,12 @@ describe('Announce', () => {
     const message = { topic: 'blah', body: { hi: 'there' } }
 
     await announce.subscribe({
-      name: 'raw',
+      queueName: 'raw',
       topics: ['*'],
       handle: rawDfd.resolve
     })
     await jsonAnnounce.subscribe({
-      name: 'json',
+      queueName: 'json',
       topics: ['*'],
       handle: jsonDfd.resolve
     })
@@ -208,7 +208,7 @@ describe('Announce', () => {
     announce.use(json(), () => middleware)
 
     await announce.subscribe({
-      name: 'json',
+      queueName: 'json',
       topics: ['*'],
       handle: dfd.resolve
     })
@@ -248,7 +248,7 @@ describe('Announce', () => {
 
 class TestSubscriber implements Subscriber<Buffer> {
   topics = ['test.test']
-  name = 'test'
+  queueName = 'test'
   dfd: Deferred<any>
 
   constructor() {

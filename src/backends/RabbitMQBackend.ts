@@ -187,7 +187,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     const options = getQueueOptions(subscriber)
 
     await this.createExchange(channel)
-    await channel.assertQueue(subscriber.name, options)
+    await channel.assertQueue(subscriber.queueName, options)
 
     if (options.deadLetterRoutingKey) {
       await channel.assertQueue(options.deadLetterRoutingKey, { durable: true })
@@ -196,7 +196,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     await Promise.all(
       subscriber.topics.map((topic) =>
         channel.bindQueue(
-          subscriber.name,
+          subscriber.queueName,
           this.exchange,
           topic.replace(/\*/g, '#')
         )
@@ -207,7 +207,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
   private async consume(subscriber: BackendSubscriber): Promise<void> {
     const channel = await this.getChannelForSubscriber(subscriber)
 
-    await channel.consume(subscriber.name, async (message) => {
+    await channel.consume(subscriber.queueName, async (message) => {
       if (!message) {
         // Notification that something interesting has happened on the
         // channel, eg a queue has been deleted. We don't know what

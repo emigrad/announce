@@ -12,7 +12,7 @@ describe('Message utils', () => {
   const headers = { 'Content-Type': 'blah' }
   const properties = { id: '123', date: new Date() }
   const subscriber: Subscriber<any> = {
-    name: 'blah',
+    queueName: 'blah',
     topics: ['*'],
     handle: () => {}
   }
@@ -58,7 +58,7 @@ describe('Message utils', () => {
   })
 
   test.each([true, false, undefined])('getDeadLetterQueue() (%p)', (value) => {
-    const expected = value ?? true ? '~dlq-' + subscriber.name : null
+    const expected = value ?? true ? '~dlq-' + subscriber.queueName : null
 
     expect(
       getDeadLetterQueue({ ...subscriber, options: { deadLetterQueue: value } })

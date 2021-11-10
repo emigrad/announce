@@ -46,7 +46,7 @@ describe('Logger middleware', () => {
     [false, 'error'],
     [true, 'info']
   ])('Should log subscriptions (success: %p)', async (succeeded, level) => {
-    const subscriber = { name: 'abc' } as Subscriber<any>
+    const subscriber = { queueName: 'abc' } as Subscriber<any>
     let next
 
     if (succeeded) {
@@ -68,7 +68,7 @@ describe('Logger middleware', () => {
     [false, 'error'],
     [true, 'info']
   ])('Should log messages (success: %p)', async (succeeded, level) => {
-    const subscriber = { name: 'abc' } as Subscriber<any>
+    const subscriber = { queueName: 'abc' } as Subscriber<any>
     const message = getCompleteMessage({
       topic: 'abc',
       body: null,

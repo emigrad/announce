@@ -15,7 +15,7 @@ export interface SubscriberOptions {
 
 export interface Subscriber<Body extends any> {
   /** The name of the subscriber. Must be a globally unique dotted string */
-  name: string
+  queueName: string
 
   /**
    * The topics to subscribe to.

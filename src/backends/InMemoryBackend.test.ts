@@ -7,7 +7,7 @@ describe('In memory backend', () => {
   it('Should publish and receive messages', async () => {
     const dfd = new Deferred<Message<Buffer>>()
     const subscriber: BackendSubscriber = {
-      name: 'test',
+      queueName: 'test',
       topics: ['foo.bar'],
       handle: (message) => dfd.resolve(message)
     }
@@ -42,7 +42,7 @@ describe('In memory backend', () => {
     async (selector, topic, expected) => {
       let receivedMessage = false
       const subscriber: BackendSubscriber = {
-        name: 'test',
+        queueName: 'test',
         topics: [selector],
         handle: () => {
           receivedMessage = true
@@ -75,7 +75,7 @@ describe('In memory backend', () => {
     const done = Promise.all(dfds.map(({ promise }) => promise))
 
     const subscriber: BackendSubscriber = {
-      name: 'test',
+      queueName: 'test',
       topics: ['foo'],
       handle: async ({ body }) => {
         expect(numRunning).toBeLessThan(getConcurrency(subscriber))
@@ -129,7 +129,7 @@ describe('In memory backend', () => {
 
     function createSubscriber(subscriberId: number): BackendSubscriber {
       return {
-        name: 'test',
+        queueName: 'test',
         topics: ['foo'],
         handle({ body }) {
           const messageId = +body.toString()

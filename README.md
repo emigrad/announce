@@ -106,6 +106,35 @@ If you're only planning to run a single instance of your application (for exampl
 
 Publish/subscribe 
 
+# Concepts
+
+## Message
+
+A message is sent by publishers and is received by interested subscribers. It has a single topic and can contain any data. For example, a message about a user changing their email address might have a topic of `user.changed` and contain the user's old and new email addresses in the body.
+
+Each message will be added to the queues of all the subscribers that have a matching topic. This means that each message will be processed by all of the subscribers that are interested in it. 
+
+## Topic
+
+A message's topic represents what a message is about. Topics are usually organised in a hierarchy, with levels separated by a period. For example, you may have the topics `user.created`, `user.changed`, and `organization.membership.changed`, where messages pertaining to users all have topics starting with `user.`, messages relating to an organisation have topics that start with `organization.` and messages relating to an organisation's memberships start with `organization.membership.`.
+
+Subscribers can subscribe to any number of topics, and `*` acts as a wildcard, matching any number of characters. For example, a subscriber that listens to the topics `user.created` and `organization.membership.*` will receive messages with the topics `user.created` and `organization.membership.created`, but not `organization.created`. 
+
+In many cases, messages are sent in response to an event that has occurred (for example a user signing up), and thus topics are usually expressed as past tense (eg `user.created` instead of `user.create`). This is just a recommendation however, you are free to define your topics however you wish. 
+
+## Subscriber
+
+A subscriber has a queue, a set of topics it listens to, and a function to handle messages that match the set of topics. Each matching message will be added to the subscriber's queue, and will be processed by one of the subscribers of that queue.
+
+Each subscriber should use a unique queue. Since each message in a queue is delivered once, having multiple subscribers sharing the same queue will result in each subscriber only seeing some of the messages. 
+
+## Queue
+
+Each subscriber has a queue into which matching messages are placed. Messages are processed in the order in which they're added to the queue. A message is removed from queue once it has either been successfully processed by a subscriber, or it has been rejected by the subscriber's handler throwing an Error.
+
+When using Announce with an external broker such as RabbitMQ, queues will continue to receive messages even if there are no active subscribers. These messages will be processed as soon as the subscriber is re-added. For the internal backends InMemory and File, only messages sent after the subscriber has been added will be received. 
+
+
 # API
 # Error handling
 # Using middleware
@@ -128,7 +157,7 @@ announce.use(json())
 
 ## with()
 
-Call this function to add the middleware for specific subscribers. It returns a clone of the Announce instance, and only the returned copy will have the middleware applied - the original instance is unchanged. 
+Call this function to add the middleware for specific subscribers. It returns a clone of the Announce instance, and only the returned copy will have the middleware applied - the original instance is unchanged.
 
 ```javascript
 const announce = new Announce("memory://")
@@ -141,7 +170,7 @@ const delayedAnnounce = announce.with(delay({ delay: 1000 }))
 // Since this subscriber was subscribed using the original announce instance,
 // its messages will not be delayed
 await announce.subscribe({
-  name: "subscriber1",
+  queueName: "subscriber1",
   topics: ["topic1"],
   handle: () => {}
 })
@@ -149,7 +178,7 @@ await announce.subscribe({
 // This subscriber was subscribed using delayedAnnounce, so it will receive
 // its messages one second after they were sent. 
 await delayedAnnounce.subscribe({
-  name: "subscriber2",
+  queueName: "subscriber2",
   topics: ["topic2"],
   handle: () => {}
 })
@@ -250,3 +279,5 @@ See spy() example in retry.test.js
 * My process is using too much memory. Reduce the concurrency setting. If using many subscribers, you may want to use a PromiseQueue to limit the number of messages processed simultaneously 
 * Messages are being processed too slowly. Concurrency is 1 by default, try increasing
 * Turning on debug logging
+
+ 

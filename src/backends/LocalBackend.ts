@@ -35,7 +35,7 @@ export abstract class LocalBackend extends EventEmitter implements Backend {
     const matchingSubscribers = this.subscribers.filter(subscribesTo(topic))
     // Where there are multiple subscribers with the same name, only one
     // should receive each message
-    const subscribersByName = groupBy(prop('name'), matchingSubscribers)
+    const subscribersByName = groupBy(prop('queueName'), matchingSubscribers)
 
     return Object.values(subscribersByName).map(
       getSubscriberWithFewestUnprocessedMessages

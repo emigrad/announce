@@ -25,7 +25,7 @@ describe('retry middleware', () => {
 
     announce.use(retry({ initialDelay, increaseFactor, variation, maxRetries }))
     await announce.subscribe({
-      name: 'test',
+      queueName: 'test',
       topics: ['test'],
       handle: jest.fn()
     })
@@ -47,7 +47,7 @@ describe('retry middleware', () => {
       spy({ onHandle: spyDfd.resolve, onHandleError: spyDfd.reject })
     )
     await announce.subscribe({
-      name: 'test',
+      queueName: 'test',
       topics: ['test'],
       handle: handleDfd.resolve
     })
@@ -71,7 +71,7 @@ describe('retry middleware', () => {
       spy({ onHandleError: ({ error }) => spyDfd.resolve(error) })
     )
     await announce.subscribe({
-      name: 'test',
+      queueName: 'test',
       topics: ['test'],
       handle(message) {
         receivedMessages.push(message)
@@ -97,7 +97,7 @@ describe('retry middleware', () => {
       spy({ onHandleError: ({ error }) => spyDfd.resolve(error) })
     )
     await announce.subscribe({
-      name: 'test',
+      queueName: 'test',
       topics: ['test'],
       handle: (message) => {
         receivedMessages.push(message)
@@ -120,7 +120,7 @@ describe('retry middleware', () => {
       spy({ onSubscribe: ({ subscriber }) => subscribers.push(subscriber) })
     )
     const subscriber1: Subscriber<any> = {
-      name: 'test',
+      queueName: 'test',
       topics: ['test'],
       handle: () => {},
       options: {
@@ -157,7 +157,7 @@ describe('retry middleware', () => {
       })
     )
     await announce.subscribe({
-      name: 'test',
+      queueName: 'test',
       topics: ['test'],
       async handle(message) {
         receivedMessages.push(message)

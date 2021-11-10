@@ -54,7 +54,7 @@ export class FileBackend extends LocalBackend {
   async publish(message: Message<Buffer>): Promise<void> {
     await Promise.all(
       this.getMatchingSubscribers(message).map(async (subscriber) => {
-        await this.enqueue(message, subscriber.name)
+        await this.enqueue(message, subscriber.queueName)
       })
     )
   }
@@ -68,7 +68,7 @@ export class FileBackend extends LocalBackend {
     const persistedMessages = await this.loadPersistedMessages(subscriber)
 
     persistedMessages.forEach((message) =>
-      this.addToInMemoryQueue(message, subscriber.name)
+      this.addToInMemoryQueue(message, subscriber.queueName)
     )
   }
 
@@ -94,7 +94,7 @@ export class FileBackend extends LocalBackend {
     subscriber: Subscriber<Buffer>
   ): Promise<string[]> {
     try {
-      return (await readdir(this.getQueuePath(subscriber.name))).sort()
+      return (await readdir(this.getQueuePath(subscriber.queueName))).sort()
     } catch (e) {
       if (e.code === 'ENOENT') {
         return []
@@ -111,7 +111,7 @@ export class FileBackend extends LocalBackend {
     subscriber: Subscriber<Buffer>,
     id: string
   ): Promise<Message<Buffer>> {
-    const path = this.getMessagePathFromId(id, subscriber.name)
+    const path = this.getMessagePathFromId(id, subscriber.queueName)
     const rawMessage = await readFile(path, 'utf8')
 
     const parsedMessage = JSON.parse(rawMessage) as Message<string>
@@ -152,7 +152,7 @@ export class FileBackend extends LocalBackend {
   private getSubscriberForQueue(
     queue: string
   ): SubscriberWithQueue | undefined {
-    return this.subscribers.find(({ name }) => name === queue)
+    return this.subscribers.find(({ queueName }) => queueName === queue)
   }
 
   /**
@@ -185,7 +185,7 @@ export class FileBackend extends LocalBackend {
       }
     }
 
-    await this.removeFromPersistedQueue(message, subscriber.name)
+    await this.removeFromPersistedQueue(message, subscriber.queueName)
   }
 
   /**
