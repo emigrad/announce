@@ -154,7 +154,7 @@ export const retry = ({
         },
         options: {
           concurrency: 1,
-          deadLetterQueue: false
+          preserveRejectedMessages: false
         }
       }
     }

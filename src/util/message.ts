@@ -54,18 +54,29 @@ export function getConcurrency(subscriber: Subscriber<any>): number {
 }
 
 /**
- * Returns true if the subscriber has a dead letter queue
+ * Returns true if the subscriber has a dead letter topic
  */
-export function hasDeadLetterQueue(subscriber: Subscriber<any>): boolean {
-  return subscriber.options?.deadLetterQueue !== false
+export function hasDeadLetterTopic(subscriber: Subscriber<any>): boolean {
+  return subscriber.options?.preserveRejectedMessages !== false
 }
 
 /**
- * Returns the name of the subscriber's dead letter queue, or null if
+ * Returns the name of the subscriber's dead letter topic, or null if
  * it doesn't have one
  */
-export function getDeadLetterQueue(subscriber: Subscriber<any>): string | null {
-  return hasDeadLetterQueue(subscriber) ? `~dlq-${subscriber.queueName}` : null
+export function getDeadLetterTopic(subscriber: Subscriber<any>): string | null {
+  return hasDeadLetterTopic(subscriber)
+    ? `~rejected-${subscriber.queueName}`
+    : null
+}
+
+/**
+ * Returns the name of the dead letter queue for the subscriber
+ */
+export function getDeadLetterQueueName(
+  subscriber: Subscriber<any>
+): string | null {
+  return getDeadLetterTopic(subscriber)
 }
 
 /**

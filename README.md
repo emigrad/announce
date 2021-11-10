@@ -135,6 +135,58 @@ Each subscriber has a queue into which matching messages are placed. Messages ar
 When using Announce with an external broker such as RabbitMQ, queues will continue to receive messages even if there are no active subscribers. These messages will be processed as soon as the subscriber is re-added. For the internal backends InMemory and File, only messages sent after the subscriber has been added will be received. 
 
 
+## Dead letter queues and topics
+
+By default, supporting backends will republish rejected messages to the dead letter topic, which will add them to the dead letter queue `~rejected-<subscriber-queue-name>`. This is to enable debugging and reprocessing of failed messages. You can prevent rejected messages from being preserved by adding `options: { preserveRejectedMessages: false }` to the subscriber. 
+
+In general it's recommended that all processing of rejected messages be done by either the subscriber or middleware, however there may be instances where you want to add a subscriber to the dead letter topic. If you had the subscriber:
+
+```typescript
+import { Subscriber } from './Subscriber'
+
+const failingSubscriber: Subscriber<any> = {
+  queueName: "example",
+  topics: ["example"],
+  handle() {
+    throw new Error("Not today")
+  }
+}
+```
+
+You can subscribe to its rejected messages by creating another subscriber:
+
+```typescript
+import { getDeadLetterTopic } from './message'
+import { Subscriber } from './Subscriber'
+
+const rejectedMessageSubscriber: Subscriber<any> = {
+  queueName: "rejected-messages",
+  topics: [getDeadLetterTopic(failingSubscriber)],
+  handle() {
+    // ...
+  }
+}
+```
+
+In this way, `rejectedMessageSubscriber` will receive every message that `failingSubscriber` rejects, but a copy of those messages will still be preserved in the dead letter queue. 
+
+It is not recommended, but you can also consume those messages directly if needed, by setting the queueName as `getDeadLetterQueueName(failingSubscriber)`, like so:
+
+```typescript
+import { getDeadLetterQueueName, getDeadLetterTopic } from './message'
+import { Subscriber } from './Subscriber'
+
+const rejectedMessageSubscriber: Subscriber<any> = {
+  queueName: getDeadLetterQueueName(failingSubscriber),
+  topics: [getDeadLetterTopic(failingSubscriber)],
+  handle() {
+    // ...
+  }
+}
+```
+
+Doing this means that the rejected messages will not be preserved.  
+
 # API
 # Error handling
 # Using middleware

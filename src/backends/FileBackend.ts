@@ -8,7 +8,7 @@ import {
 } from 'fs'
 import { resolve } from 'path'
 import { promisify } from 'util'
-import { getDeadLetterQueue, hasDeadLetterQueue } from '../util'
+import { getDeadLetterTopic, hasDeadLetterTopic } from '../util'
 import { BackendSubscriber, Message, Subscriber } from '../types'
 import { LocalBackend, SubscriberWithQueue } from './LocalBackend'
 
@@ -180,8 +180,8 @@ export class FileBackend extends LocalBackend {
     try {
       await subscriber.handle(message)
     } catch (e) {
-      if (hasDeadLetterQueue(subscriber)) {
-        await this.enqueue(message, getDeadLetterQueue(subscriber)!)
+      if (hasDeadLetterTopic(subscriber)) {
+        await this.enqueue(message, getDeadLetterTopic(subscriber)!)
       }
     }
 

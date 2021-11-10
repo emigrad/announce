@@ -5,12 +5,13 @@ export interface SubscriberOptions {
    * How many messages can be simultaneously processed by a subscriber. Defaults to 1
    */
   concurrency?: number
+
   /**
    * Whether to save rejected messages in a dead letter queue. Not all backends
    * support dead letter queues (eg InMemoryBackend doesn't). Defaults to true for
    * supporting backends.
    */
-  deadLetterQueue?: boolean
+  preserveRejectedMessages?: boolean
 }
 
 export interface Subscriber<Body extends any> {

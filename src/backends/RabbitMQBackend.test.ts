@@ -6,7 +6,7 @@ import { BackendSubscriber, Message } from '../types'
 import {
   createMessage,
   getCompleteMessage,
-  getDeadLetterQueue,
+  getDeadLetterTopic,
   getHeader
 } from '../util'
 import { RabbitMQBackend } from './RabbitMQBackend'
@@ -98,10 +98,10 @@ describe('RabbitMQ Backend', () => {
       }
     }
     const dlqSubscriber: BackendSubscriber = {
-      queueName: getDeadLetterQueue(subscriber)!,
+      queueName: getDeadLetterTopic(subscriber)!,
       topics: [],
       handle: dfd.resolve,
-      options: { deadLetterQueue: false }
+      options: { preserveRejectedMessages: false }
     }
 
     await channel.deleteQueue(dlqSubscriber.queueName)
@@ -153,18 +153,18 @@ describe('RabbitMQ Backend', () => {
 
   it.each([false, true, undefined])(
     'Should honour DLQ setting (%p)',
-    async (enableDlq) => {
+    async (preserveRejectedMessages) => {
       const topic = 'test.test1'
       const subscriber: BackendSubscriber = {
         queueName: queueName,
         topics: [topic],
-        options: { deadLetterQueue: enableDlq },
+        options: { preserveRejectedMessages },
         async handle() {
           throw new Error('Nope')
         }
       }
 
-      const dlq = `~dlq-${subscriber.queueName}`
+      const dlq = `~rejected-${subscriber.queueName}`
       await channel.deleteQueue(dlq)
 
       await rabbitMq.subscribe(subscriber)
@@ -172,7 +172,10 @@ describe('RabbitMQ Backend', () => {
         getCompleteMessage({ topic, body: Buffer.from('') })
       )
 
-      if (enableDlq === true || enableDlq === undefined) {
+      if (
+        preserveRejectedMessages === true ||
+        preserveRejectedMessages === undefined
+      ) {
         const dfd = new Deferred()
         await channel.consume(dlq, () => dfd.resolve())
         await dfd

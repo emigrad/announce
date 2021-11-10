@@ -2,8 +2,8 @@ import { Subscriber } from '../types'
 import {
   createMessage,
   getCompleteMessage,
-  getDeadLetterQueue,
-  hasDeadLetterQueue
+  getDeadLetterTopic,
+  hasDeadLetterTopic
 } from './message'
 
 describe('Message utils', () => {
@@ -53,15 +53,21 @@ describe('Message utils', () => {
     const expected = value ?? true
 
     expect(
-      hasDeadLetterQueue({ ...subscriber, options: { deadLetterQueue: value } })
+      hasDeadLetterTopic({
+        ...subscriber,
+        options: { preserveRejectedMessages: value }
+      })
     ).toBe(expected)
   })
 
   test.each([true, false, undefined])('getDeadLetterQueue() (%p)', (value) => {
-    const expected = value ?? true ? '~dlq-' + subscriber.queueName : null
+    const expected = value ?? true ? '~rejected-' + subscriber.queueName : null
 
     expect(
-      getDeadLetterQueue({ ...subscriber, options: { deadLetterQueue: value } })
+      getDeadLetterTopic({
+        ...subscriber,
+        options: { preserveRejectedMessages: value }
+      })
     ).toBe(expected)
   })
 })

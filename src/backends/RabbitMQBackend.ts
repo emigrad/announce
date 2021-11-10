@@ -4,9 +4,10 @@ import cuid from 'cuid'
 import { EventEmitter } from 'events'
 import {
   getConcurrency,
-  getDeadLetterQueue,
+  getDeadLetterQueueName,
+  getDeadLetterTopic,
   getHeader,
-  hasDeadLetterQueue
+  hasDeadLetterTopic
 } from '../util'
 import { Backend, BackendSubscriber, Message, Subscriber } from '../types'
 
@@ -184,13 +185,17 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
 
   private async createQueue(subscriber: Subscriber<Buffer>): Promise<void> {
     const channel = await this.getChannelForSubscriber(subscriber)
-    const options = getQueueOptions(subscriber)
+    const options = this.getQueueOptions(subscriber)
 
     await this.createExchange(channel)
     await channel.assertQueue(subscriber.queueName, options)
 
-    if (options.deadLetterRoutingKey) {
-      await channel.assertQueue(options.deadLetterRoutingKey, { durable: true })
+    if (hasDeadLetterTopic(subscriber)) {
+      const deadLetterQueue = getDeadLetterQueueName(subscriber)!
+      const deadLetterTopic = getDeadLetterTopic(subscriber)!
+
+      await channel.assertQueue(deadLetterQueue, { durable: true })
+      await channel.bindQueue(deadLetterQueue, this.exchange, deadLetterTopic)
     }
 
     await Promise.all(
@@ -266,17 +271,17 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
       (subscriber) => getConcurrency(subscriber) === concurrency
     )
   }
-}
 
-function getQueueOptions(subscriber: Subscriber<Buffer>): Options.AssertQueue {
-  const options: Options.AssertQueue = { durable: true }
+  private getQueueOptions(subscriber: Subscriber<Buffer>): Options.AssertQueue {
+    const options: Options.AssertQueue = { durable: true }
 
-  if (hasDeadLetterQueue(subscriber)) {
-    options.deadLetterExchange = ''
-    options.deadLetterRoutingKey = getDeadLetterQueue(subscriber)!
+    if (hasDeadLetterTopic(subscriber)) {
+      options.deadLetterExchange = this.exchange
+      options.deadLetterRoutingKey = getDeadLetterTopic(subscriber)!
+    }
+
+    return options
   }
-
-  return options
 }
 
 function convertMessage(amqpMessage: ConsumeMessage): Message<Buffer> {
