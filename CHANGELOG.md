@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.5.1](https://gitlab.com/emigrad/announce/compare/v0.5.0...v0.5.1) (2022-05-02)
+
+
+### Bug Fixes
+
+* add missing export for batch ([39e9bc8](https://gitlab.com/emigrad/announce/commit/39e9bc86ff09c26b77274f96e5d43934a821d679))
+
 ## [0.5.0](https://gitlab.com/emigrad/announce/compare/v0.4.5...v0.5.0) (2022-05-02)
 
 
