@@ -27,7 +27,7 @@ describe('batch', () => {
         onHandleError: ({ message }) => rejectedMessages.push(message),
         onSubscribe: ({ subscriber }) => {
           if (subscriber.queueName === 'test') {
-            expect(subscriber.options.concurrency).toBe(
+            expect(subscriber.options?.concurrency).toBe(
               (concurrency + 1) * maxMessages
             )
           }
