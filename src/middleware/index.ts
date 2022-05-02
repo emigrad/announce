@@ -1,3 +1,4 @@
+export * from './batch'
 export * from './delay'
 export * from './json'
 export * from './log'
