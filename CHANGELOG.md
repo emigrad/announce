@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.5.0](https://gitlab.com/emigrad/announce/compare/v0.4.5...v0.5.0) (2022-05-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* publish rejected messages to the dead letter topic
+* change subscriber name property to queueName
+* rename jsonSerializer middleware to json
+
+### Features
+
+* add batch middleware ([e808a35](https://gitlab.com/emigrad/announce/commit/e808a35e2ea799b7deabcc2bd74abefcdeaa5ebd))
+* add retry and spy middlewares ([ac20bbb](https://gitlab.com/emigrad/announce/commit/ac20bbb852042b926d23cb6bd3434df82435936e))
+* change subscriber name property to queueName ([e378052](https://gitlab.com/emigrad/announce/commit/e3780528ffdb6938f4b0922c11f48bb398447c62))
+* make the "not a Buffer" error more helpful ([d5c5fa8](https://gitlab.com/emigrad/announce/commit/d5c5fa80bc2c0e3fa0e6f82804b9a23eb71b6f6b))
+* publish rejected messages to the dead letter topic ([1a073c0](https://gitlab.com/emigrad/announce/commit/1a073c0a7ba5562bc85c89816c433a60d36bd356))
+* rename jsonSerializer middleware to json ([72d4488](https://gitlab.com/emigrad/announce/commit/72d448828e3ff536746c34bf6eee84e0e7117529))
+
+
+### Bug Fixes
+
+* memory/file backends sending the same message to duplicate subscribers ([c58ed89](https://gitlab.com/emigrad/announce/commit/c58ed894ca9665870042a65fd69b1f790e4755e9))
+
 ### [0.4.5](https://gitlab.com/emigrad/announce/compare/v0.4.4...v0.4.5) (2021-10-30)
 
 
