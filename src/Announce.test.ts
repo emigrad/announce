@@ -191,11 +191,15 @@ describe('Announce', () => {
     expect(((await rawDfd.promise) as Message<any>).body).toBeInstanceOf(Buffer)
     expect(((await jsonDfd.promise) as Message<any>).body).toEqual(message.body)
 
-    // The base announce's middleware should have been called before the
-    // json announce's middleware. If it's called after, the message body
-    // will be a Buffer instead
+    // The base announce's middleware should have been called after the
+    // json announce's middleware since it was defined first and we're publishing, therefore
+    // it should receive a Buffer
     expect(middleware.publish).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.objectContaining(message) })
+      expect.objectContaining({
+        message: expect.objectContaining({
+          body: Buffer.from(JSON.stringify(message.body))
+        })
+      })
     )
   })
 

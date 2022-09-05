@@ -121,7 +121,9 @@ export class Announce extends EventEmitter {
       return this.backend.subscribe({ ...subscriber, handle: next })
     }
 
-    const [middleware, ...remainingMiddlewares] = middlewares
+    const middleware = middlewares[middlewares.length - 1]
+    const remainingMiddlewares = middlewares.slice(0, middlewares.length - 1)
+
     if (middleware.handle) {
       subscriber.handle = (message) => {
         return middleware.handle!({ message, next, subscriber })
@@ -147,7 +149,8 @@ export class Announce extends EventEmitter {
     message: Message<any>,
     middlewares: readonly MiddlewareInstance[]
   ): Promise<void> {
-    const [middleware, ...remainingMiddlewares] = middlewares
+    const middleware = middlewares[middlewares.length - 1]
+    const remainingMiddlewares = middlewares.slice(0, middlewares.length - 1)
 
     if (!middleware) {
       try {

@@ -191,9 +191,11 @@ Doing this means that the rejected messages will not be preserved.
 # Error handling
 # Using middleware
 
-Announce provides a very powerful middleware system, in fact almost all of announce's capabilities are provided through middleware. This section covers the middleware that is provided by Announce itself; see [Writing middleware](#writing-middleware) below for details on how you can create your own. 
+Announce provides a very powerful middleware system, in fact almost all of Announce's capabilities are provided through middleware. This section covers the middleware that is provided by Announce itself; see [Writing middleware](#writing-middleware) below for details on how you can create your own. 
 
-A default `announce` instance provides an extremely minimal interface to the backend, so in almost all cases you will want to add some middleware to enhance its functionality. There are two ways to add middleware, `use()` and `with()`. In most cases you should use `use()`, since that installs the middleware globally. Use `with()` when you want the middleware to only be active for certain subscribers, or when publishing certain messages. 
+A default `announce` instance provides an extremely minimal interface to the backend, so in almost all cases you will want to add some middleware to enhance its functionality.
+
+There are two ways to add middleware, `use()` and `with()`. In most cases you should use `use()`, since that installs the middleware globally. Use `with()` when you want the middleware to only be active for certain subscribers, or when publishing certain messages. 
 
 ## use()
 
@@ -235,6 +237,14 @@ await delayedAnnounce.subscribe({
   handle: () => {}
 })
 ```
+
+## Middleware order
+
+The order that middleware is added is important - middlewares added earlier sit closer to the backend. You can visualise the middleware as a stack sitting on top of the backend. 
+
+When publishing a message, the most recently-added middleware processes the message, and passes it on to next-most recently added, and so on, until the first-added middleware passes it to the backend. When receiving a message, the opposite is true - the first-added middleware processes the message, then passes it on to the next-added middleware, until it reaches the most recently-added middleware and finally the queue's handler. 
+
+This means that you should generally add "low-level" middleware like `json()` before than higher-level middleware like `log()`, so that log() is able to log the deserialised contents of the messages. If `log()` is added before `json()`, it would be closer to the backend and only the serialised `Buffer` instances.  
 
 # Middlewares
 
@@ -332,4 +342,3 @@ See spy() example in retry.test.js
 * Messages are being processed too slowly. Concurrency is 1 by default, try increasing
 * Turning on debug logging
 
- 

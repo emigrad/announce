@@ -43,8 +43,8 @@ describe('retry middleware', () => {
     const handleDfd = new Deferred<Message<any>>()
     const announce = new Announce('memory://')
     announce.use(
-      retry(),
-      spy({ onHandle: spyDfd.resolve, onHandleError: spyDfd.reject })
+      spy({ onHandle: spyDfd.resolve, onHandleError: spyDfd.reject }),
+      retry()
     )
     await announce.subscribe({
       queueName: 'test',
@@ -67,8 +67,8 @@ describe('retry middleware', () => {
     const announce = new Announce('memory://')
     const error = new Error('Oh no')
     announce.use(
-      retry({ maxRetries }),
-      spy({ onHandleError: ({ error }) => spyDfd.resolve(error) })
+      spy({ onHandleError: ({ error }) => spyDfd.resolve(error) }),
+      retry({ maxRetries })
     )
     await announce.subscribe({
       queueName: 'test',
@@ -93,8 +93,8 @@ describe('retry middleware', () => {
     const receivedMessages: Message<any>[] = []
     const error = new Error()
     announce.use(
-      retry({ canRetry }),
-      spy({ onHandleError: ({ error }) => spyDfd.resolve(error) })
+      spy({ onHandleError: ({ error }) => spyDfd.resolve(error) }),
+      retry({ canRetry })
     )
     await announce.subscribe({
       queueName: 'test',
@@ -116,8 +116,8 @@ describe('retry middleware', () => {
     const subscribers: Subscriber<any>[] = []
 
     announce.use(
-      retry(),
-      spy({ onSubscribe: ({ subscriber }) => subscribers.push(subscriber) })
+      spy({ onSubscribe: ({ subscriber }) => subscribers.push(subscriber) }),
+      retry()
     )
     const subscriber1: Subscriber<any> = {
       queueName: 'test',
@@ -144,7 +144,6 @@ describe('retry middleware', () => {
     const spyDfd = new Deferred<void>()
     const announce = new Announce('memory://')
     announce.use(
-      retry(),
       spy({
         onHandle: ({ message }) => {
           if (message.topic.includes('retry')) {
@@ -154,7 +153,8 @@ describe('retry middleware', () => {
             }
           }
         }
-      })
+      }),
+      retry()
     )
     await announce.subscribe({
       queueName: 'test',

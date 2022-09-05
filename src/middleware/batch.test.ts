@@ -21,7 +21,6 @@ describe('batch', () => {
     acknowledgedMessages = []
     rejectedMessages = []
     announce = new Announce('memory://').use(
-      batch({ maxMessages, maxTime }),
       spy({
         onHandle: ({ message }) => acknowledgedMessages.push(message),
         onHandleError: ({ message }) => rejectedMessages.push(message),
@@ -32,7 +31,8 @@ describe('batch', () => {
             )
           }
         }
-      })
+      }),
+      batch({ maxMessages, maxTime })
     )
 
     await announce.subscribe({
