@@ -39,7 +39,10 @@ describe('RabbitMQ Backend', () => {
     rabbitMq.on('error', squelch)
   })
 
-  afterEach(() => rabbitMq.close())
+  afterEach(async () => {
+    await rabbitMq.close()
+    jest.unmock('amqplib')
+  })
 
   afterAll(() => connection.close())
 
@@ -75,6 +78,29 @@ describe('RabbitMQ Backend', () => {
     await rabbitMq.publish(getCompleteMessage(message))
 
     expect(await dfd.promise).toMatchObject(message)
+  })
+
+  it("Should throw a helpful message if amqplib isn't available", async () => {
+    const expectedError = {
+      message: expect.stringContaining(
+        'Unable to import amqplib package. This package is needed to connect to RabbitMQ.'
+      )
+    }
+    jest.mock('amqplib', () => {
+      throw new Error('Not installed')
+    })
+
+    const dfd = new Deferred()
+    const backend = new RabbitMQBackend(url, { exchange })
+    backend.on('error', (err) => dfd.resolve(err))
+
+    expect(await dfd.promise).toMatchObject(expectedError)
+
+    await expect(
+      backend.publish(
+        getCompleteMessage(createMessage('test', Buffer.from('Hi there')))
+      )
+    ).rejects.toMatchObject(expectedError)
   })
 
   it('Rejected messages should be sent to the DLQ', async () => {

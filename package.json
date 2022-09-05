@@ -24,11 +24,18 @@
     "release": "standard-version"
   },
   "dependencies": {
-    "amqplib": "^0.8.0",
     "cuid": "^2.1.8",
     "promise-queue": "^2.2.5",
     "rambda": "^6.9.0",
     "ts-deferred": "^1.0.4"
+  },
+  "peerDependencies": {
+    "amqplib": ">= 0.8.0"
+  },
+  "peerDependenciesMeta": {
+    "amqplib": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@babel/core": "^7.14.3",
@@ -42,6 +49,7 @@
     "@types/jest": "^26.0.23",
     "@types/promise-queue": "^2.2.0",
     "@types/rimraf": "^3.0.0",
+    "amqplib": ">= 0.8.0",
     "babel-jest": "^27.0.2",
     "dotenv-flow": "^3.2.0",
     "eslint": "^7.27.0",

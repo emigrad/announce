@@ -1,5 +1,5 @@
-import { Channel, ConfirmChannel, connect, Connection } from 'amqplib'
-import { ConsumeMessage, Options } from 'amqplib/properties'
+import type { Channel, ConfirmChannel, Connection } from 'amqplib'
+import type { ConsumeMessage, Options } from 'amqplib/properties'
 import cuid from 'cuid'
 import { EventEmitter } from 'events'
 import {
@@ -42,16 +42,18 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
   constructor(url: string, { exchange = 'events' }: RabbitMQOptions = {}) {
     super()
 
-    this.connection = connect(url)
+    this.connection = this.connect(url)
     this.exchange = exchange
     this.subscribers = []
     this.subscriberChannels = {}
     this.rebuildPromises = {}
 
-    this.on('error', () => this.close())
     this.connection.then(
       (connection) => {
-        connection.on('error', (err) => this.emit('error', err))
+        connection.on('error', (err) => {
+          this.emit('error', err)
+          this.close()
+        })
       },
       (err) => this.emit('error', err)
     )
@@ -281,6 +283,21 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     }
 
     return options
+  }
+
+  private async connect(url: string): Promise<Connection> {
+    let amqplib
+
+    try {
+      amqplib = await import('amqplib')
+    } catch {
+      throw new Error(
+        'Unable to import amqplib package. This package is needed to connect to RabbitMQ. ' +
+          'Please add it to your package.json by running npm i amqplib'
+      )
+    }
+
+    return amqplib.connect(url)
   }
 }
 
