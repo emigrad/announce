@@ -24,6 +24,7 @@
     "release": "standard-version"
   },
   "dependencies": {
+    "@types/promise-queue": "^2.2.0",
     "cuid": "^2.1.8",
     "promise-queue": "^2.2.5",
     "rambda": "^6.9.0",
@@ -47,7 +48,6 @@
     "@types/amqplib": "^0.8.2",
     "@types/dotenv-flow": "^3.2.0",
     "@types/jest": "^26.0.23",
-    "@types/promise-queue": "^2.2.0",
     "@types/rimraf": "^3.0.0",
     "amqplib": ">= 0.8.0",
     "babel-jest": "^27.0.2",
