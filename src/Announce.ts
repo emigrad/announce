@@ -11,7 +11,10 @@ import {
 } from './types'
 import { getCompleteMessage, handleToSubscriberMiddleware } from './util'
 
-export interface AnnounceOptions {
+export interface AnnounceArgs {
+  /** The URL of the backend to connect to */
+  url?: string
+  /** The factory to construct backends */
   backendFactory?: Pick<BackendFactory, 'getBackend'>
 }
 
@@ -21,16 +24,15 @@ export class Announce extends EventEmitter {
   private readonly publishMiddlewares: PublishMiddleware[] = []
   private closePromise: Promise<void> | undefined
 
-  constructor(
-    private readonly url: string = process.env.ANNOUNCE_BACKEND_URL!,
-    private readonly options: AnnounceOptions = {}
-  ) {
+  constructor({
+    url = process.env.ANNOUNCE_BACKEND_URL!,
+    backendFactory = new BackendFactory()
+  }: AnnounceArgs = {}) {
     super()
 
-    const { backendFactory = new BackendFactory() } = options
     const backend = backendFactory.getBackend(url ?? '')
 
-    if (!url) {
+    if (!backend && !url) {
       throw new Error(
         'Backend URL not defined - did you set ANNOUNCE_BACKEND_URL?'
       )

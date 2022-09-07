@@ -18,7 +18,7 @@ describe('Announce', () => {
         topics: [topic],
         handle: jest.fn()
       }
-      const announce = new Announce('memory://')
+      const announce = new Announce({ url: 'memory://' })
 
       await expect(announce.subscribe(subscriber)).rejects.toBeDefined()
     }
@@ -30,7 +30,8 @@ describe('Announce', () => {
       const backend = new InMemoryBackend()
       backend.publish = jest.fn()
 
-      const announce = new Announce('test://', {
+      const announce = new Announce({
+        url: 'test://',
         backendFactory: { getBackend: () => backend }
       })
 
@@ -54,7 +55,7 @@ describe('Announce', () => {
       info: jest.fn(),
       trace: jest.fn()
     } as Logger
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
     announce.use(log(logger))
 
     await announce.subscribe(subscriber)
@@ -67,7 +68,7 @@ describe('Announce', () => {
 
   it('Should be able to round-trip a JSON-encoded message', async () => {
     const dfd = new Deferred()
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
     const body = { hi: 'there' }
     announce.use(json())
 
@@ -98,7 +99,7 @@ describe('Announce', () => {
       getBackend: jest.fn().mockReturnValue(new InMemoryBackend())
     }
 
-    new Announce(undefined, { backendFactory })
+    new Announce({ backendFactory })
     expect(backendFactory.getBackend).toHaveBeenCalledWith(backendUrl)
   })
 
@@ -106,7 +107,9 @@ describe('Announce', () => {
     const backendUrl = 'blah://'
     const backendFactory = { getBackend: jest.fn() }
 
-    expect(() => new Announce(backendUrl, { backendFactory })).toThrow(Error)
+    expect(() => new Announce({ url: backendUrl, backendFactory })).toThrow(
+      Error
+    )
     expect(backendFactory.getBackend).toHaveBeenCalledWith(backendUrl)
   })
 
@@ -122,7 +125,7 @@ describe('Announce', () => {
     // handle it
     backend.close = jest.fn().mockRejectedValue(undefined)
 
-    const announce = new Announce('memory://', { backendFactory })
+    const announce = new Announce({ url: 'memory://', backendFactory })
     announce.on('error', errorDfd.resolve)
     announce.on('close', closeDfd.resolve)
 
@@ -149,7 +152,7 @@ describe('Announce', () => {
         backend.close = () => Promise.resolve()
       }
 
-      const announce = new Announce('memory://', { backendFactory })
+      const announce = new Announce({ url: 'memory://', backendFactory })
       announce.on('close', dfd.resolve)
 
       await announce.close()
@@ -161,7 +164,7 @@ describe('Announce', () => {
     const rawDfd = new Deferred()
     const jsonDfd = new Deferred()
     const publishMiddleware = jest.fn(({ message, next }) => next(message))
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
     announce.use(({ addPublishMiddleware }) =>
       addPublishMiddleware(publishMiddleware)
     )
@@ -208,7 +211,7 @@ describe('Announce', () => {
     const middleware = {
       subscribe: jest.fn(({ subscriber, next }) => next(subscriber))
     }
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
     announce.use(json(), () => middleware)
 
     await announce.subscribe({
@@ -225,7 +228,7 @@ describe('Announce', () => {
 
   it(`with()'ed instances should still emit events`, async () => {
     const dfd = new Deferred()
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
     announce.with(json()).on('close', dfd.resolve)
 
     await announce.close()
@@ -233,14 +236,14 @@ describe('Announce', () => {
   })
 
   it('Calling close() more than once should be a no-op', () => {
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
 
     expect(announce.close()).toBe(announce.close())
   })
 
   it('Should correctly handle subscribers that are class instances', async () => {
     const subscriber = new TestSubscriber()
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
     const body = Buffer.from('hi there')
     await announce.subscribe(subscriber)
 
@@ -251,7 +254,7 @@ describe('Announce', () => {
 
   it('Should prevent middleware from registering handlers/subscribers after it has completed', () => {
     let args: MiddlewareArgs
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
     announce.use((_args) => (args = _args))
 
     expect(() => args.addSubscribeMiddleware(async () => {})).toThrowError(

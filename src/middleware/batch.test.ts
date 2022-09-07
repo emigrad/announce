@@ -20,7 +20,7 @@ describe('batch', () => {
     receivedBatches = []
     acknowledgedMessages = []
     rejectedMessages = []
-    announce = new Announce('memory://').use(
+    announce = new Announce({ url: 'memory://' }).use(
       spy({
         onHandle: ({ message }) => acknowledgedMessages.push(message),
         onHandleError: ({ message }) => rejectedMessages.push(message),

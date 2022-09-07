@@ -29,7 +29,7 @@ import { Announce } from '@emigrad/announce'
 const announce = new Announce()
 ```
 
-While we recommend that you let Announce read the backend URL from the environment variable, you can also specify it directly if needed by providing it as the first parameter instead: `new Announce('memory://')`
+While we recommend that you let Announce read the backend URL from the environment variable, you can also specify it directly if needed by providing it as the first parameter instead: `new Announce({url: 'memory://'})`
 
 
 An announce instance starts out as a blank slate - messages are sent and received directly to the backend, and only instances of `Buffer` can be used. We can make it much more useful by adding some middleware:
@@ -202,7 +202,7 @@ There are two ways to add middleware, `use()` and `with()`. In most cases you sh
 Call this function to add the middleware globally. It will affect all future subscribers and calls to `publish()`. Any subscribers that were added _prior_ to calling `use()` will not be affected.
 
 ```javascript
-const announce = new Announce("memory://")
+const announce = new Announce()
 
 // All subscribers added after this point will have JSON-formatted messages
 // automatically deserialised for them
@@ -214,7 +214,7 @@ announce.use(json())
 Call this function to add the middleware for specific subscribers. It returns a clone of the Announce instance, and only the returned copy will have the middleware applied - the original instance is unchanged.
 
 ```javascript
-const announce = new Announce("memory://")
+const announce = new Announce()
 
 // Both subscribers will have JSON-formatted messages deserialised for them
 announce.use(json())

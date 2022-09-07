@@ -5,7 +5,7 @@ import { spy } from './spy'
 
 describe('spy middleware', () => {
   it('Should notify of successful subscriptions', async () => {
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
     const beforeSubscribe = jest.fn()
     const onSubscribe = jest.fn()
     const subscriber: Subscriber<any> = {
@@ -42,7 +42,7 @@ describe('spy middleware', () => {
   })
 
   it('Should notify of failed subscriptions', async () => {
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
     const onSubscribeError = jest.fn()
     const subscriber: Subscriber<any> = {
       queueName: 'test',
@@ -74,7 +74,7 @@ describe('spy middleware', () => {
   })
 
   it('Should notify of successful publishes', async () => {
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
     const beforePublish = jest.fn()
     const onPublish = jest.fn()
     const message = getCompleteMessage(createMessage('hi', Buffer.from('')))
@@ -87,7 +87,7 @@ describe('spy middleware', () => {
   })
 
   it('Should notify of failed publishes', async () => {
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
     const onPublishError = jest.fn()
     const message = getCompleteMessage(
       createMessage('hi', 'Strings are not allowed - must be a Buffer')
@@ -106,7 +106,7 @@ describe('spy middleware', () => {
   })
 
   it('Should notify when a message is successfully handled', async () => {
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
     const beforeHandle = jest.fn()
     const onHandle = jest.fn()
     const subscriber: Subscriber<any> = {
@@ -149,7 +149,7 @@ describe('spy middleware', () => {
   })
 
   it('Should notify when a message is rejected', async () => {
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
     const onHandleError = jest.fn()
     const error = new Error('Oh no')
     const subscriber: Subscriber<any> = {

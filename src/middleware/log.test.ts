@@ -16,9 +16,7 @@ describe('Logger middleware', () => {
       error: jest.fn()
     }
     backend = new InMemoryBackend()
-    announce = new Announce('memory://', {
-      backendFactory: { getBackend: () => backend }
-    })
+    announce = new Announce({ backendFactory: { getBackend: () => backend } })
     announce.use(json(), log(logger))
   })
 

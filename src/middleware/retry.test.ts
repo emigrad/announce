@@ -17,7 +17,7 @@ describe('retry middleware', () => {
   })
 
   it('Should set up retry queues', async () => {
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
     const initialDelay = 4000
     const increaseFactor = 5
     const variation = 0.2
@@ -41,7 +41,7 @@ describe('retry middleware', () => {
   it('Should not retry successful messages', async () => {
     const spyDfd = new Deferred<any>()
     const handleDfd = new Deferred<Message<any>>()
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
     announce.use(
       spy({ onHandle: spyDfd.resolve, onHandleError: spyDfd.reject }),
       retry()
@@ -64,7 +64,7 @@ describe('retry middleware', () => {
     const maxRetries = 2
     const receivedMessages: Message<any>[] = []
     const spyDfd = new Deferred<void>()
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
     const error = new Error('Oh no')
     announce.use(
       spy({ onHandleError: ({ error }) => spyDfd.resolve(error) }),
@@ -88,7 +88,7 @@ describe('retry middleware', () => {
 
   it('Should not retry failures if canRetry() returns false', async () => {
     const spyDfd = new Deferred<any>()
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
     const canRetry = jest.fn().mockReturnValue(false)
     const receivedMessages: Message<any>[] = []
     const error = new Error()
@@ -112,7 +112,7 @@ describe('retry middleware', () => {
   })
 
   it('Should not subscribe to the retry queues multiple times for equivalent subscribers', async () => {
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
     const subscribers: Subscriber<any>[] = []
 
     announce.use(
@@ -142,7 +142,7 @@ describe('retry middleware', () => {
     const receivedMessages: Message<any>[] = []
     const retryMessages: Message<any>[] = []
     const spyDfd = new Deferred<void>()
-    const announce = new Announce('memory://')
+    const announce = new Announce({ url: 'memory://' })
     announce.use(
       spy({
         onHandle: ({ message }) => {
