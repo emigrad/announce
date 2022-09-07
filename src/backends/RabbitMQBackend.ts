@@ -1,5 +1,5 @@
-import type { Channel, ConfirmChannel, Connection } from 'amqplib'
-import type { ConsumeMessage, Options } from 'amqplib/properties'
+import { Channel, ConfirmChannel, Connection } from 'amqplib'
+import { ConsumeMessage, Options } from 'amqplib/properties'
 import cuid from 'cuid'
 import { EventEmitter } from 'events'
 import {
