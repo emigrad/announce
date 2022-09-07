@@ -15,7 +15,9 @@ build:
     - yarn run prepublishOnly
   artifacts:
     reports:
-      cobertura: coverage/cobertura-coverage.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/cobertura-coverage.xml
       junit: junit.xml
   rules:
     - if: $CI_COMMIT_BRANCH
@@ -54,6 +56,8 @@ publish:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
   artifacts:
     reports:
-      cobertura: coverage/cobertura-coverage.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/cobertura-coverage.xml
       junit: junit.xml
 
