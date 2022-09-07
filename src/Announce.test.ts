@@ -3,7 +3,7 @@ import { Announce } from './Announce'
 import { InMemoryBackend } from './backends'
 import { createMessage, getCompleteMessage } from './util'
 import { json, log } from './middleware'
-import { Logger, Message, Subscriber } from './types'
+import { Logger, Message, MiddlewareArgs, Subscriber } from './types'
 
 describe('Announce', () => {
   beforeEach(() => {
@@ -160,11 +160,11 @@ describe('Announce', () => {
   it('Should support with()', async () => {
     const rawDfd = new Deferred()
     const jsonDfd = new Deferred()
-    const middleware = {
-      publish: jest.fn(({ message, next }) => next(message))
-    }
+    const publishMiddleware = jest.fn(({ message, next }) => next(message))
     const announce = new Announce('memory://')
-    announce.use(() => middleware)
+    announce.use(({ addPublishMiddleware }) =>
+      addPublishMiddleware(publishMiddleware)
+    )
     const jsonAnnounce = announce.with(json())
     const message = { topic: 'blah', body: { hi: 'there' } }
 
@@ -183,7 +183,7 @@ describe('Announce', () => {
     // so should not be able to publish non-buffer messages
     await expect(announce.publish(message)).rejects.toBeDefined()
 
-    middleware.publish.mockClear()
+    publishMiddleware.mockClear()
 
     // This should succeed because we have the JSON middleware
     await jsonAnnounce.publish(message)
@@ -194,7 +194,7 @@ describe('Announce', () => {
     // The base announce's middleware should have been called after the
     // json announce's middleware since it was defined first and we're publishing, therefore
     // it should receive a Buffer
-    expect(middleware.publish).toHaveBeenCalledWith(
+    expect(publishMiddleware).toHaveBeenCalledWith(
       expect.objectContaining({
         message: expect.objectContaining({
           body: Buffer.from(JSON.stringify(message.body))
@@ -247,6 +247,22 @@ describe('Announce', () => {
     await announce.publish(createMessage(subscriber.topics[0], body))
 
     expect(await subscriber.dfd.promise).toMatchObject({ body })
+  })
+
+  it('Should prevent middleware from registering handlers/subscribers after it has completed', () => {
+    let args: MiddlewareArgs
+    const announce = new Announce('memory://')
+    announce.use((_args) => (args = _args))
+
+    expect(() => args.addSubscribeMiddleware(async () => {})).toThrowError(
+      'addSubscribeMiddleware() must be called immediately'
+    )
+    expect(() => args.addPublishMiddleware(async () => {})).toThrowError(
+      'addPublishMiddleware() must be called immediately'
+    )
+    expect(() => args.addHandleMiddleware(async () => {})).toThrowError(
+      'addHandleMiddleware() must be called immediately'
+    )
   })
 })
 

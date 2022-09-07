@@ -1,6 +1,6 @@
 import PromiseQueue from 'promise-queue'
 import { Deferred } from 'ts-deferred'
-import { Message, Middleware } from '../types'
+import { Message, Middleware, Subscriber } from '../types'
 import { createMessage, getCompleteMessage } from '../util'
 
 export interface BatchArgs {
@@ -17,18 +17,20 @@ export interface BatchArgs {
  */
 export const batch: (args: BatchArgs) => Middleware =
   ({ maxTime, maxMessages }) =>
-  (announce) => {
-    return {
-      async subscribe({ subscriber, next }): Promise<void> {
-        const concurrency = subscriber.options?.concurrency ?? 1
-        // We use a promise queue to ensure we never exceed the handler's
-        // declared concurrency
-        const promiseQueue = new PromiseQueue(concurrency)
-        let batchTimeout: NodeJS.Timeout | undefined
-        let batchMessages: Message<any>[] | undefined
-        let batchDeferred: Deferred<unknown> | undefined
+  ({ announce, addSubscribeMiddleware }) => {
+    addSubscribeMiddleware(async ({ subscriber, next }) => {
+      const concurrency = subscriber.options?.concurrency ?? 1
+      // We use a promise queue to ensure we never exceed the handler's
+      // declared concurrency
+      const promiseQueue = new PromiseQueue(concurrency)
+      let batchTimeout: NodeJS.Timeout | undefined
+      let batchMessages: Message<any>[] | undefined
+      let batchDeferred: Deferred<unknown> | undefined
 
-        await next({
+      await next(getNextSubscriber())
+
+      function getNextSubscriber(): Subscriber<any> {
+        return {
           ...subscriber,
           options: {
             ...subscriber.options,
@@ -36,51 +38,53 @@ export const batch: (args: BatchArgs) => Middleware =
             // is processing
             concurrency: (concurrency + 1) * maxMessages
           },
-          handle(message) {
-            if (!batchDeferred) {
-              batchDeferred = new Deferred()
-              batchTimeout = setTimeout(processBatch, maxTime)
-              batchMessages = []
-            }
-
-            const promise = batchDeferred.promise
-            batchMessages!.push(message)
-
-            if (batchMessages!.length >= maxMessages) {
-              processBatch()
-            }
-
-            return promise
-          }
-        })
-
-        function processBatch() {
-          const messages = batchMessages!
-          const deferred = batchDeferred!
-          clearTimeout(batchTimeout!)
-
-          batchDeferred = undefined
-          batchMessages = undefined
-          batchTimeout = undefined
-
-          promiseQueue
-            .add(() =>
-              subscriber.handle(
-                getCompleteMessage(
-                  createMessage(
-                    messages[0].topic,
-                    messages,
-                    {},
-                    { date: messages[0].properties.date }
-                  )
-                ),
-                {
-                  announce
-                }
-              )
-            )
-            .then(deferred.resolve, deferred.reject)
+          handle
         }
       }
-    }
+
+      async function handle(message: Message<any>): Promise<unknown> {
+        if (!batchDeferred) {
+          batchDeferred = new Deferred()
+          batchTimeout = setTimeout(processBatch, maxTime)
+          batchMessages = []
+        }
+
+        const promise = batchDeferred.promise
+        batchMessages!.push(message)
+
+        if (batchMessages!.length >= maxMessages) {
+          processBatch()
+        }
+
+        return promise
+      }
+
+      function processBatch() {
+        const messages = batchMessages!
+        const deferred = batchDeferred!
+        clearTimeout(batchTimeout!)
+
+        batchDeferred = undefined
+        batchMessages = undefined
+        batchTimeout = undefined
+
+        promiseQueue
+          .add(() =>
+            subscriber.handle(
+              getCompleteMessage(
+                createMessage(
+                  messages[0].topic,
+                  messages,
+                  {},
+                  { date: messages[0].properties.date }
+                )
+              ),
+              {
+                announce
+              }
+            )
+          )
+          .then(deferred.resolve, deferred.reject)
+      }
+    })
   }

@@ -1,5 +1,5 @@
 import { Announce } from '../Announce'
-import { Subscriber } from '../types'
+import { MiddlewareArgs, SubscribeMiddleware, Subscriber } from '../types'
 import { getCompleteMessage } from '../util'
 import { delay, withDelay } from './delay'
 
@@ -19,7 +19,6 @@ describe('delay middware', () => {
 
   it('Should pass the subscriber details as-is', async () => {
     const delayMs = 100
-    const delayMiddleware = delay({ delay: delayMs })(announce)
     const nextResult = '55'
     const next = jest.fn().mockResolvedValue(nextResult)
     const subscriber = {
@@ -27,10 +26,16 @@ describe('delay middware', () => {
       topics: ['abc'],
       options: { concurrency: 5 }
     } as Subscriber<any>
+    let subscribeMiddleware: SubscribeMiddleware
 
-    expect(await delayMiddleware.subscribe!({ subscriber, next })).toBe(
-      nextResult
-    )
+    delay({ delay: delayMs })({
+      announce,
+      addSubscribeMiddleware(_subscibeMiddleware) {
+        subscribeMiddleware = _subscibeMiddleware
+      }
+    } as MiddlewareArgs)
+
+    expect(await subscribeMiddleware!({ subscriber, next })).toBe(nextResult)
     expect(next).toHaveBeenCalledWith(expect.objectContaining(subscriber))
   })
 
@@ -38,7 +43,6 @@ describe('delay middware', () => {
     'Should process messages after a delay (elapsed: %p)',
     async (elapsed) => {
       const delayMs = 750
-      const delayMiddleware = delay({ delay: delayMs })(announce)
       const message = getCompleteMessage({
         topic: 'abc',
         body: null,
@@ -54,13 +58,21 @@ describe('delay middware', () => {
         }
       } as Subscriber<any>
       let wrappedSubscriber: Subscriber<any>
+      let subscribeMiddleware: SubscribeMiddleware
+
+      delay({ delay: delayMs })({
+        announce,
+        addSubscribeMiddleware(_subscibeMiddleware) {
+          subscribeMiddleware = _subscibeMiddleware
+        }
+      } as MiddlewareArgs)
 
       const next = jest.fn((_subscriber) => {
         wrappedSubscriber = _subscriber
         return Promise.resolve()
       })
 
-      await delayMiddleware.subscribe!({ subscriber, next })
+      await subscribeMiddleware!({ subscriber, next })
 
       const handlePromise = wrappedSubscriber!
         .handle(message, { announce })
@@ -88,7 +100,6 @@ describe('delay middware', () => {
   )
 
   it('Should not call handlers after announce instance has closed', async () => {
-    const delayMiddleware = delay({ delay: 100 })(announce)
     let listener: () => any
     announce.on = ((event: string, _listener: () => any) => {
       expect(event).toBe('close')
@@ -111,7 +122,16 @@ describe('delay middware', () => {
       return Promise.resolve()
     })
 
-    await delayMiddleware.subscribe!({ subscriber, next })
+    let subscribeMiddleware: SubscribeMiddleware
+
+    delay({ delay: 100 })({
+      announce,
+      addSubscribeMiddleware(_subscibeMiddleware) {
+        subscribeMiddleware = _subscibeMiddleware
+      }
+    } as MiddlewareArgs)
+
+    await subscribeMiddleware!({ subscriber, next })
     const handlePromise = wrappedSubscriber!.handle(message, { announce })
 
     listener!()

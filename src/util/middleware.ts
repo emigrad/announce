@@ -8,10 +8,10 @@ export function createMiddleware<WrapperArgs extends any[], Body extends any>(
   wrapper: SubscriberWrapper<WrapperArgs, Body>
 ): (...wrapperArgs: WrapperArgs) => Middleware {
   return (...wrapperArgs: WrapperArgs) => {
-    return () => ({
-      subscribe({ subscriber, next }) {
+    return ({ addSubscribeMiddleware }) => {
+      addSubscribeMiddleware(async ({ subscriber, next }) => {
         return next(wrapper(subscriber, ...wrapperArgs))
-      }
-    })
+      })
+    }
   }
 }

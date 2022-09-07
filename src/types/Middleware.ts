@@ -2,27 +2,29 @@ import { Announce } from '../Announce'
 import { Message } from './Message'
 import { Subscriber } from './Subscriber'
 
-export interface Middleware {
-  (announce: Announce): MiddlewareInstance
-}
-
-export interface MiddlewareInstance {
+export interface MiddlewareArgs {
   /**
-   * Publishes a message to all interested subscribers. Calling
+   * The Announce instance that the middleware will be added to
+   */
+  announce: Announce
+
+  /**
+   * Adds middleware that is called when a message is published. Calling
    * next(message) passes the message on to the next middleware
-   * in the chain, or the backend if this is the innermost middleware. The
+   * in the chain, or the backend if this is the first middleware. The
    * returned promise should be resolved once the middleware has finished
    * handling the message, just like a normal backend.
    */
-  publish?: (args: PublishMiddlewareArgs) => Promise<void>
+  addPublishMiddleware: (publishMiddleware: PublishMiddleware) => void
 
   /**
-   * Called whenever a new subscriber is added. Calling next(subscriber) passes
-   * the subscriber on to the next middleware in the chain, or the backend if this
-   * is the innermost middleware. The returned promise should be resolved
-   * once the subscriber has been successfully added to the backend.
+   * Adds middleware that's called whenever a subscriber is added. Calling
+   * next(subscriber) passes the subscriber on to the next middleware in
+   * the chain, or the backend if this is the first middleware. The
+   * returned promise should be resolved once the subscriber has been
+   * successfully added to the backend.
    */
-  subscribe?: (args: SubscribeMiddlewareArgs) => Promise<void>
+  addSubscribeMiddleware: (subscribeMiddleware: SubscribeMiddleware) => void
 
   /**
    * Called whenever a message is received. Calling next(message) passes
@@ -34,19 +36,32 @@ export interface MiddlewareInstance {
    * then provided as the handle() method in the subscriber passed to
    * subscribe()
    */
-  handle?: (args: HandleMiddlewareArgs) => Promise<void>
+  addHandleMiddleware: (handleMiddleware: HandleMiddleware) => void
 }
 
+export interface Middleware {
+  (args: MiddlewareArgs): void
+}
+
+export interface PublishMiddleware {
+  (args: PublishMiddlewareArgs): Promise<void>
+}
 export interface PublishMiddlewareArgs {
   message: Message<any>
   next: (message: Message<any>) => Promise<void>
 }
 
+export interface SubscribeMiddleware {
+  (args: SubscribeMiddlewareArgs): Promise<void>
+}
 export interface SubscribeMiddlewareArgs {
   subscriber: Subscriber<any>
   next: (subscriber: Subscriber<any>) => Promise<void>
 }
 
+export interface HandleMiddleware {
+  (args: HandleMiddlewareArgs): Promise<void>
+}
 export interface HandleMiddlewareArgs {
   message: Message<any>
   subscriber: Subscriber<any>

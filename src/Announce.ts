@@ -4,11 +4,12 @@ import {
   Backend,
   Message,
   Middleware,
-  MiddlewareInstance,
-  UnpublishedMessage,
-  Subscriber
+  PublishMiddleware,
+  SubscribeMiddleware,
+  Subscriber,
+  UnpublishedMessage
 } from './types'
-import { getCompleteMessage } from './util'
+import { getCompleteMessage, handleToSubscriberMiddleware } from './util'
 
 export interface AnnounceOptions {
   backendFactory?: Pick<BackendFactory, 'getBackend'>
@@ -16,7 +17,8 @@ export interface AnnounceOptions {
 
 export class Announce extends EventEmitter {
   private readonly backend: Backend
-  private readonly middlewares: MiddlewareInstance[]
+  private readonly subscribeMiddlewares: SubscribeMiddleware[] = []
+  private readonly publishMiddlewares: PublishMiddleware[] = []
   private closePromise: Promise<void> | undefined
 
   constructor(
@@ -38,17 +40,48 @@ export class Announce extends EventEmitter {
 
     this.backend = backend
     this.backend.on('error', this.destroy.bind(this))
-    this.middlewares = []
   }
 
   /**
-   * Adds the middlewares to the chain. When processing a message or
-   * subscriber, the middlewares are called in the order that they're added
+   * Adds the middlewares to the chain. When adding a subscriber or
+   * publishing a message, the last-added middleware is called first. When
+   * handling a message, the innermost middleware is called first.
    */
   use(...middlewares: Middleware[]): this {
-    this.middlewares.push(
-      ...middlewares.map((constructor) => constructor(this))
-    )
+    middlewares.forEach((middlewareConstructor) => {
+      let finished = false
+
+      middlewareConstructor({
+        announce: this,
+        addHandleMiddleware: (handleMiddleware) => {
+          if (!finished) {
+            this.subscribeMiddlewares.push(
+              handleToSubscriberMiddleware(handleMiddleware, { announce: this })
+            )
+          } else {
+            throw new Error('addHandleMiddleware() must be called immediately')
+          }
+        },
+        addPublishMiddleware: (publishMiddleware) => {
+          if (!finished) {
+            this.publishMiddlewares.push(publishMiddleware)
+          } else {
+            throw new Error('addPublishMiddleware() must be called immediately')
+          }
+        },
+        addSubscribeMiddleware: (subscribeMiddleware) => {
+          if (!finished) {
+            this.subscribeMiddlewares.push(subscribeMiddleware)
+          } else {
+            throw new Error(
+              'addSubscribeMiddleware() must be called immediately'
+            )
+          }
+        }
+      })
+
+      finished = true
+    })
 
     return this
   }
@@ -64,7 +97,8 @@ export class Announce extends EventEmitter {
    */
   with(...middlewares: Middleware[]): Announce {
     const copy = Object.create(this, {
-      middlewares: { value: [...this.middlewares] }
+      subscribeMiddlewares: { value: [...this.subscribeMiddlewares] },
+      publishMiddlewares: { value: [...this.publishMiddlewares] }
     })
 
     return copy.use(...middlewares)
@@ -73,7 +107,7 @@ export class Announce extends EventEmitter {
   async subscribe(...subscribers: Subscriber<any>[]): Promise<void> {
     await Promise.all(
       subscribers.map((subscriber) =>
-        this._subscribe(cloneSubscriber(subscriber), this.middlewares)
+        this._subscribe(cloneSubscriber(subscriber), this.subscribeMiddlewares)
       )
     )
   }
@@ -84,7 +118,7 @@ export class Announce extends EventEmitter {
     return Promise.all(
       messages.map(async (message) => {
         const completeMessage = getCompleteMessage(message)
-        await this._publish(completeMessage, this.middlewares)
+        await this._publish(completeMessage, this.publishMiddlewares)
 
         return completeMessage
       })
@@ -111,61 +145,42 @@ export class Announce extends EventEmitter {
 
   private _subscribe(
     subscriber: Subscriber<any>,
-    middlewares: readonly MiddlewareInstance[]
+    middlewares: readonly SubscribeMiddleware[]
   ): Promise<void> {
-    const announce = this
-    const origHandle = subscriber.handle.bind(subscriber)
-
-    if (!middlewares.length) {
-      validateSubscriber(subscriber)
-      return this.backend.subscribe({ ...subscriber, handle: next })
-    }
-
     const middleware = middlewares[middlewares.length - 1]
     const remainingMiddlewares = middlewares.slice(0, middlewares.length - 1)
 
-    if (middleware.handle) {
-      subscriber.handle = (message) => {
-        return middleware.handle!({ message, next, subscriber })
-      }
-    }
-
-    if (middleware.subscribe) {
-      return middleware.subscribe({
+    if (middleware) {
+      return middleware({
         subscriber,
         next: (newSubscriber) =>
           this._subscribe(newSubscriber, remainingMiddlewares)
       })
     } else {
-      return this._subscribe(subscriber, remainingMiddlewares)
-    }
-
-    function next(message: Message<any>): Promise<void> {
-      return origHandle(message, { announce })
+      validateSubscriber(subscriber)
+      return this.backend.subscribe(subscriber)
     }
   }
 
   private _publish(
     message: Message<any>,
-    middlewares: readonly MiddlewareInstance[]
+    middlewares: readonly PublishMiddleware[]
   ): Promise<void> {
     const middleware = middlewares[middlewares.length - 1]
     const remainingMiddlewares = middlewares.slice(0, middlewares.length - 1)
 
-    if (!middleware) {
+    if (middleware) {
+      return middleware({
+        message,
+        next: (newMessage) => this._publish(newMessage, remainingMiddlewares)
+      })
+    } else {
       try {
         validateMessage(message)
       } catch (e) {
         return Promise.reject(e)
       }
       return this.backend.publish(message)
-    } else if (middleware.publish) {
-      return middleware.publish({
-        message,
-        next: (newMessage) => this._publish(newMessage, remainingMiddlewares)
-      })
-    } else {
-      return this._publish(message, remainingMiddlewares)
     }
   }
 }

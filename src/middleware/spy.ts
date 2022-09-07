@@ -83,8 +83,13 @@ export function spy(listeners: SpyArgs): Middleware {
     onHandleError = doNothing
   } = listeners
 
-  return (announce) => ({
-    async publish({ message, next }) {
+  return ({
+    announce,
+    addPublishMiddleware,
+    addSubscribeMiddleware,
+    addHandleMiddleware
+  }) => {
+    addPublishMiddleware(async ({ message, next }) => {
       beforePublish({ message, announce })
 
       try {
@@ -94,9 +99,9 @@ export function spy(listeners: SpyArgs): Middleware {
         onPublishError({ error, message, announce })
         throw error
       }
-    },
+    })
 
-    async subscribe({ subscriber, next }) {
+    addSubscribeMiddleware(async ({ subscriber, next }) => {
       beforeSubscribe({ subscriber, announce })
 
       try {
@@ -106,9 +111,9 @@ export function spy(listeners: SpyArgs): Middleware {
         onSubscribeError({ subscriber, error, announce })
         throw error
       }
-    },
+    })
 
-    async handle({ message, subscriber, next }) {
+    addHandleMiddleware(async ({ message, subscriber, next }) => {
       beforeHandle({ message, subscriber, announce })
 
       try {
@@ -118,6 +123,6 @@ export function spy(listeners: SpyArgs): Middleware {
         onHandleError({ error, message, subscriber, announce })
         throw error
       }
-    }
-  })
+    })
+  }
 }

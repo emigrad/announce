@@ -51,14 +51,11 @@ describe('spy middleware', () => {
     }
     const error = new Error('Oh no')
 
-    announce.use(
-      () => ({
-        subscribe: () => {
-          throw error
-        }
-      }),
-      spy({ onSubscribeError })
-    )
+    announce.use(({ addSubscribeMiddleware }) => {
+      addSubscribeMiddleware(() => {
+        throw error
+      })
+    }, spy({ onSubscribeError }))
 
     await expect(announce.subscribe(subscriber)).rejects.toBe(error)
 

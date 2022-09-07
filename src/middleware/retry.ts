@@ -28,44 +28,42 @@ export const retry = ({
   maxRetries = 5,
   canRetry = () => true
 }: RetryArgs = {}): Middleware => {
-  return (announce) => {
+  return ({ announce, addSubscribeMiddleware }) => {
     const initializedQueues: string[] = []
 
-    return {
-      async subscribe({ subscriber, next }) {
-        await createRetryQueues(subscriber, next)
+    addSubscribeMiddleware(async ({ subscriber, next }) => {
+      await createRetryQueues(subscriber, next)
 
-        await next({
-          ...subscriber,
-          topics: [
-            ...subscriber.topics,
-            // This topic is added so that we can re-inject messages we want
-            // to try into just this queue. We can't use the subscriber's
-            // existing topics because there may be other subscribers listening
-            // to them
-            getRetryTopic(subscriber, 0)
-          ],
-          async handle(message, args) {
-            // Since retried messages have a different topic, we have to
-            // restore the message's original topic before sending it to
-            // the subscriber
-            if (message.headers[TOPIC_HEADER] != null) {
-              message.topic = message.headers[TOPIC_HEADER]
-            }
+      await next({
+        ...subscriber,
+        topics: [
+          ...subscriber.topics,
+          // This topic is added so that we can re-inject messages we want
+          // to try into just this queue. We can't use the subscriber's
+          // existing topics because there may be other subscribers listening
+          // to them
+          getRetryTopic(subscriber, 0)
+        ],
+        async handle(message, args) {
+          // Since retried messages have a different topic, we have to
+          // restore the message's original topic before sending it to
+          // the subscriber
+          if (message.headers[TOPIC_HEADER] != null) {
+            message.topic = message.headers[TOPIC_HEADER]
+          }
 
-            try {
-              await subscriber.handle(message, args)
-            } catch (e) {
-              if (canRetry(e, message) && getNumRetries(message) < maxRetries) {
-                await retryMessage(subscriber, message)
-              } else {
-                throw e
-              }
+          try {
+            await subscriber.handle(message, args)
+          } catch (e) {
+            if (canRetry(e, message) && getNumRetries(message) < maxRetries) {
+              await retryMessage(subscriber, message)
+            } else {
+              throw e
             }
           }
-        })
-      }
-    }
+        }
+      })
+    })
 
     /**
      * Creates the queues for the messages that need to be retried

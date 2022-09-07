@@ -1,19 +1,35 @@
-import { Announce } from '../Announce'
-import { Message, Subscriber } from '../types'
+import {
+  HandleMiddleware,
+  Message,
+  MiddlewareArgs,
+  PublishMiddleware,
+  Subscriber
+} from '../types'
 import { getCompleteMessage, getHeader } from '../util'
 import { json } from './json'
 
 describe('json middleware', () => {
-  const announce = {} as Announce
-  const serializer = json()(announce)
   const subscriber = {} as Subscriber<any>
+  let publishMiddleware: PublishMiddleware
+  let handleMiddleware: HandleMiddleware
+
+  beforeAll(() => {
+    json()({
+      addPublishMiddleware(_publishMiddleware) {
+        publishMiddleware = _publishMiddleware
+      },
+      addHandleMiddleware(_handleMiddleware) {
+        handleMiddleware = _handleMiddleware
+      }
+    } as MiddlewareArgs)
+  })
 
   it('Should stringify messages that are not Buffers', async () => {
     const nextResult = '55'
     const next = jest.fn().mockResolvedValue(nextResult)
     const message = { body: { hi: 'there' } } as Message<any>
 
-    expect(await serializer.publish!({ message, next })).toBe(nextResult)
+    expect(await publishMiddleware!({ message, next })).toBe(nextResult)
     expect(JSON.parse(next.mock.calls[0][0].body.toString())).toEqual(
       message.body
     )
@@ -30,7 +46,7 @@ describe('json middleware', () => {
       headers: {}
     } as Message<any>
 
-    expect(await serializer.publish!({ message, next })).toBe(nextResult)
+    expect(await publishMiddleware!({ message, next })).toBe(nextResult)
     expect(next).toHaveBeenCalledWith(message)
     expect(
       getHeader(next.mock.calls[0][0] as Message<any>, 'Content-Type')
@@ -47,7 +63,7 @@ describe('json middleware', () => {
       headers: { 'content-type': 'application/json' }
     })
 
-    expect(await serializer.handle!({ message, next, subscriber })).toBe(
+    expect(await handleMiddleware!({ message, next, subscriber })).toBe(
       nextResult
     )
     expect(next.mock.calls[0][0].body).toEqual(body)
@@ -64,7 +80,7 @@ describe('json middleware', () => {
         headers: { 'content-type': contentType as string }
       })
 
-      expect(await serializer.handle!({ message, next, subscriber })).toBe(
+      expect(await handleMiddleware!({ message, next, subscriber })).toBe(
         nextResult
       )
       expect(next).toHaveBeenCalledWith(message)

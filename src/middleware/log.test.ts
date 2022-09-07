@@ -1,19 +1,25 @@
 import { Announce } from '../Announce'
-import { Logger, MiddlewareInstance, Subscriber } from '../types'
+import { InMemoryBackend } from '../backends'
+import { Logger, Subscriber } from '../types'
 import { getCompleteMessage } from '../util'
+import { json } from './json'
 import { log } from './log'
 
 describe('Logger middleware', () => {
   let logger: Logger
-  const announce = {} as Announce
-  let loggerMiddleware: MiddlewareInstance
+  let announce: Announce
+  let backend: InMemoryBackend
 
   beforeEach(() => {
     logger = {
       info: jest.fn(),
       error: jest.fn()
     }
-    loggerMiddleware = log(logger)(announce)
+    backend = new InMemoryBackend()
+    announce = new Announce('memory://', {
+      backendFactory: { getBackend: () => backend }
+    })
+    announce.use(json(), log(logger))
   })
 
   it.each([
@@ -25,20 +31,16 @@ describe('Logger middleware', () => {
       body: null,
       headers: { id: '33' }
     })
-    let next
 
     if (succeeded) {
-      next = jest.fn().mockResolvedValue(null)
-      await loggerMiddleware.publish!({ message, next })
+      await announce.publish(message)
     } else {
       const error = new Error()
-      next = jest.fn().mockRejectedValue(error)
-      await expect(loggerMiddleware.publish!({ message, next })).rejects.toBe(
-        error
-      )
+      backend.publish = jest.fn().mockRejectedValue(error)
+
+      await expect(announce.publish!(message)).rejects.toBe(error)
     }
 
-    expect(next).toHaveBeenCalledWith(message)
     expect(logger[level as keyof Logger]).toHaveBeenCalled()
   })
 
@@ -46,21 +48,20 @@ describe('Logger middleware', () => {
     [false, 'error'],
     [true, 'info']
   ])('Should log subscriptions (success: %p)', async (succeeded, level) => {
-    const subscriber = { queueName: 'abc' } as Subscriber<any>
-    let next
+    const subscriber = {
+      queueName: 'abc',
+      topics: ['abc'],
+      handle: () => {}
+    } as Subscriber<any>
 
     if (succeeded) {
-      next = jest.fn().mockResolvedValue(null)
-      await loggerMiddleware.subscribe!({ subscriber, next })
+      await announce.subscribe(subscriber)
     } else {
       const error = new Error()
-      next = jest.fn().mockRejectedValue(error)
-      await expect(
-        loggerMiddleware.subscribe!({ subscriber, next })
-      ).rejects.toBe(error)
+      backend.subscribe = jest.fn().mockRejectedValue(error)
+      await expect(announce.subscribe(subscriber)).rejects.toBe(error)
     }
 
-    expect(next).toHaveBeenCalledWith(subscriber)
     expect(logger[level as keyof Logger]).toHaveBeenCalled()
   })
 
@@ -68,26 +69,29 @@ describe('Logger middleware', () => {
     [false, 'error'],
     [true, 'info']
   ])('Should log messages (success: %p)', async (succeeded, level) => {
-    const subscriber = { queueName: 'abc' } as Subscriber<any>
+    const error = new Error()
+    const subscriber = {
+      queueName: 'abc',
+      topics: ['abc'],
+      handle: () => {
+        if (!succeeded) {
+          throw error
+        }
+      }
+    } as Subscriber<any>
     const message = getCompleteMessage({
       topic: 'abc',
       body: null,
       properties: { id: '33' }
     })
-    let next
 
-    if (succeeded) {
-      next = jest.fn().mockResolvedValue(null)
-      await loggerMiddleware.handle!({ next, subscriber, message })
-    } else {
-      const error = new Error()
-      next = jest.fn().mockRejectedValue(error)
-      await expect(
-        loggerMiddleware.handle!({ message, next, subscriber })
-      ).rejects.toBe(error)
-    }
+    await announce.subscribe(subscriber)
+    await announce.publish(message)
 
-    expect(next).toHaveBeenCalledWith(message)
-    expect(logger[level as keyof Logger]).toHaveBeenCalled()
+    expect(logger[level as keyof Logger]).toHaveBeenCalledWith(
+      expect.objectContaining({
+        msg: expect.stringContaining('message for abc')
+      })
+    )
   })
 })
