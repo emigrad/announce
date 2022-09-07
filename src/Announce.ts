@@ -1,7 +1,9 @@
 import { EventEmitter } from 'events'
-import { BackendFactory } from './backends'
+import { backendFactory } from './backends'
 import {
   Backend,
+  BackendFactory,
+  BackendSubscriber,
   Message,
   Middleware,
   PublishMiddleware,
@@ -15,8 +17,10 @@ export interface AnnounceArgs {
   /** The URL of the backend to connect to */
   url?: string
   /** The factory to construct backends */
-  backendFactory?: Pick<BackendFactory, 'getBackend'>
+  backendFactory?: BackendFactory
 }
+
+const DEFAULT_BACKEND_FACTORY = backendFactory()
 
 export class Announce extends EventEmitter {
   private readonly backend: Backend
@@ -25,12 +29,12 @@ export class Announce extends EventEmitter {
   private closePromise: Promise<void> | undefined
 
   constructor({
-    url = process.env.ANNOUNCE_BACKEND_URL!,
-    backendFactory = new BackendFactory()
+    url = process.env.ANNOUNCE_BACKEND_URL,
+    backendFactory = DEFAULT_BACKEND_FACTORY
   }: AnnounceArgs = {}) {
     super()
 
-    const backend = backendFactory.getBackend(url ?? '')
+    const backend = backendFactory(url ?? '')
 
     if (!backend && !url) {
       throw new Error(
@@ -160,7 +164,7 @@ export class Announce extends EventEmitter {
       })
     } else {
       validateSubscriber(subscriber)
-      return this.backend.subscribe(subscriber)
+      return this.backend.subscribe(subscriber as BackendSubscriber)
     }
   }
 

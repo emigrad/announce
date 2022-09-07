@@ -1,6 +1,5 @@
 import * as Buffer from 'buffer'
 import { EventEmitter } from 'events'
-import { Handler } from './Handler'
 import { Message } from './Message'
 import { SubscriberOptions } from './Subscriber'
 
@@ -48,7 +47,7 @@ export interface BackendSubscriber {
   /**
    * The function to handle received messages
    */
-  handle: Handler<Buffer>
+  handle: (message: Message<Buffer>) => unknown | Promise<unknown>
 
   /**
    * Any extra options

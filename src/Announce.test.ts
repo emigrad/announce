@@ -32,7 +32,7 @@ describe('Announce', () => {
 
       const announce = new Announce({
         url: 'test://',
-        backendFactory: { getBackend: () => backend }
+        backendFactory: () => backend
       })
 
       await expect(
@@ -95,22 +95,20 @@ describe('Announce', () => {
     const backendUrl = 'blah://'
     process.env.ANNOUNCE_BACKEND_URL = backendUrl
 
-    const backendFactory = {
-      getBackend: jest.fn().mockReturnValue(new InMemoryBackend())
-    }
+    const backendFactory = jest.fn().mockReturnValue(new InMemoryBackend())
 
     new Announce({ backendFactory })
-    expect(backendFactory.getBackend).toHaveBeenCalledWith(backendUrl)
+    expect(backendFactory).toHaveBeenCalledWith(backendUrl)
   })
 
   it('Should immediately throw an error if the URL is unsupported', () => {
     const backendUrl = 'blah://'
-    const backendFactory = { getBackend: jest.fn() }
+    const backendFactory = jest.fn()
 
     expect(() => new Announce({ url: backendUrl, backendFactory })).toThrow(
       Error
     )
-    expect(backendFactory.getBackend).toHaveBeenCalledWith(backendUrl)
+    expect(backendFactory).toHaveBeenCalledWith(backendUrl)
   })
 
   it('Should close the backend when the backend encounters an error', async () => {
@@ -118,9 +116,8 @@ describe('Announce', () => {
     const errorDfd = new Deferred()
     const closeDfd = new Deferred()
     const backend = new InMemoryBackend()
-    const backendFactory = {
-      getBackend: jest.fn().mockReturnValue(backend)
-    }
+    const backendFactory = jest.fn().mockReturnValue(backend)
+
     // Simulate a rejection of the close promise, to ensure we correctly
     // handle it
     backend.close = jest.fn().mockRejectedValue(undefined)
@@ -143,7 +140,7 @@ describe('Announce', () => {
     async (rejection) => {
       const dfd = new Deferred()
       const backend = new InMemoryBackend()
-      const backendFactory = { getBackend: jest.fn().mockReturnValue(backend) }
+      const backendFactory = jest.fn().mockReturnValue(backend)
       // Simulate a rejection of the close promise, to ensure we correctly
       // handle it
       if (rejection) {
