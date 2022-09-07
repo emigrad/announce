@@ -255,13 +255,13 @@ describe('Announce', () => {
     announce.use((_args) => (args = _args))
 
     expect(() => args.addSubscribeMiddleware(async () => {})).toThrowError(
-      'addSubscribeMiddleware() must be called immediately'
+      "addSubscribeMiddleware() must be called from inside the middleware function, it can't be called after it has returned"
     )
     expect(() => args.addPublishMiddleware(async () => {})).toThrowError(
-      'addPublishMiddleware() must be called immediately'
+      "addPublishMiddleware() must be called from inside the middleware function, it can't be called after it has returned"
     )
     expect(() => args.addHandleMiddleware(async () => {})).toThrowError(
-      'addHandleMiddleware() must be called immediately'
+      "addHandleMiddleware() must be called from inside the middleware function, it can't be called after it has returned"
     )
   })
 })

@@ -38,10 +38,15 @@ export class Announce extends EventEmitter {
 
     if (!backend && !url) {
       throw new Error(
-        'Backend URL not defined - did you set ANNOUNCE_BACKEND_URL?'
+        'Backend URL not defined - either set the environment variable ANNOUNCE_BACKEND_URL ' +
+          'or pass in {url: ...} as a parameter. "memory://" is a good value to get started with ' +
+          'for local development, but for production use you almost certainly want to use an ' +
+          'external message broker. See README.md for a list of supported backends.'
       )
     } else if (!backend) {
-      throw new Error(`Unsupported backend url: ${url}`)
+      throw new Error(
+        `Unsupported backend url: ${url}. See README.md for a list of supported backends.`
+      )
     }
 
     this.backend = backend
@@ -65,14 +70,18 @@ export class Announce extends EventEmitter {
               handleToSubscriberMiddleware(handleMiddleware, { announce: this })
             )
           } else {
-            throw new Error('addHandleMiddleware() must be called immediately')
+            throw new Error(
+              "addHandleMiddleware() must be called from inside the middleware function, it can't be called after it has returned"
+            )
           }
         },
         addPublishMiddleware: (publishMiddleware) => {
           if (!finished) {
             this.publishMiddlewares.push(publishMiddleware)
           } else {
-            throw new Error('addPublishMiddleware() must be called immediately')
+            throw new Error(
+              "addPublishMiddleware() must be called from inside the middleware function, it can't be called after it has returned"
+            )
           }
         },
         addSubscribeMiddleware: (subscribeMiddleware) => {
@@ -80,7 +89,7 @@ export class Announce extends EventEmitter {
             this.subscribeMiddlewares.push(subscribeMiddleware)
           } else {
             throw new Error(
-              'addSubscribeMiddleware() must be called immediately'
+              "addSubscribeMiddleware() must be called from inside the middleware function, it can't be called after it has returned"
             )
           }
         }
