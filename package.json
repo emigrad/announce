@@ -5,7 +5,7 @@
   "files": [
     "dist"
   ],
-  "license": "UNLICENSED",
+  "license": "MIT",
   "types": "dist/index.d.ts",
   "scripts": {
     "services:start": "docker-compose up",
