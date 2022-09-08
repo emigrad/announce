@@ -1,9 +1,9 @@
 import { Announce } from '../Announce'
 import { InMemoryBackend } from '../backends'
-import { Logger, Subscriber } from '../types'
+import { Subscriber } from '../types'
 import { getCompleteMessage } from '../util'
 import { json } from './json'
-import { log } from './log'
+import { log, LogFunction } from './log'
 
 describe('Logger middleware', () => {
   let logger: Logger
@@ -12,17 +12,18 @@ describe('Logger middleware', () => {
 
   beforeEach(() => {
     logger = {
+      debug: jest.fn(),
       info: jest.fn(),
       error: jest.fn()
-    }
+    } as Logger
     backend = new InMemoryBackend()
     announce = new Announce({ backendFactory: () => backend })
-    announce.use(json(), log(logger))
+    announce.use(json(), log({ logger, logLevels: { handleSuccess: 'info' } }))
   })
 
   it.each([
     [false, 'error'],
-    [true, 'info']
+    [true, 'debug']
   ])('Should log publishes (success: %p)', async (succeeded, level) => {
     const message = getCompleteMessage({
       topic: 'abc',
@@ -93,3 +94,8 @@ describe('Logger middleware', () => {
     )
   })
 })
+
+interface Logger {
+  info: LogFunction
+  error: LogFunction
+}

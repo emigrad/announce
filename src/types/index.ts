@@ -1,7 +1,6 @@
 export * from './Backend'
 export * from './BackendFactory'
 export * from './Handler'
-export * from './Logger'
 export * from './Message'
 export * from './Middleware'
 export * from './Subscriber'

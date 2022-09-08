@@ -1,9 +1,10 @@
+import pino from 'pino'
 import { Deferred } from 'ts-deferred'
 import { Announce } from './Announce'
 import { InMemoryBackend } from './backends'
 import { createMessage, getCompleteMessage } from './util'
 import { json, log } from './middleware'
-import { Logger, Message, MiddlewareArgs, Subscriber } from './types'
+import { Message, MiddlewareArgs, Subscriber } from './types'
 
 describe('Announce', () => {
   beforeEach(() => {
@@ -50,13 +51,11 @@ describe('Announce', () => {
       topics: ['foo'],
       handle: jest.fn().mockRejectedValue(error)
     }
-    const logger = {
-      error: () => dfd.resolve(),
-      info: jest.fn(),
-      trace: jest.fn()
-    } as Logger
+    const logger = pino({ enabled: false })
     const announce = new Announce({ url: 'memory://' })
-    announce.use(log(logger))
+    announce.use(log({ logger }))
+
+    jest.spyOn(logger, 'error').mockImplementation(() => dfd.resolve())
 
     await announce.subscribe(subscriber)
     await announce.publish(

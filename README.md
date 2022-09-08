@@ -42,7 +42,7 @@ const announce = new Announce()
 
 // If you have a logger with a Winston-like API, you can 
 // have announce log the messages it sends and receives
-announce.use(log(logger))
+announce.use(log({ logger }))
 
 // This allows us to send and receive any objects that can be serialised to JSON
 announce.use(json())
@@ -252,11 +252,13 @@ This is a list of the middlewares provided by Announce. See [Writing middleware]
 
 ## log()
 
-`log()` logs subscriptions, publishes, processed messages and errors. Most loggers are supported, eg Winston, Bunyan and Pino, however this middleware uses the `msg` property for the log message, whereas some loggers such as Winston use `message`. If this is the case for your logger, you may wish to use a wrapper or write your own logging middleware using [spy()](#spy) (see [log.ts](./src/middleware/log.ts) for an example of how to do this).
+`log()` logs subscriptions, publishes, processed messages and errors. Many loggers (eg Pino and Bunyan) are supported without further configuration, but some (most notably Winston) prefer an event's message to be under the `message` key instead of `msg`. For these loggers, you can provide the `messageKey: 'message'` argument so that log events from Announce look the same as log events from other parts of your system. 
 
 ### Options
 
-* `logger`: (required) The logger. log() will work with any logger that provides the following interface: `{info: (details: {msg: string}) => any, error: (details: {msg: string, error: any})`. 
+* `logger`: (required) The logger. By default, log() will work with any logger that provides the following interface: `{debug: (details: {msg: string}), info: (details: {msg: string}) => any, error: (details: {msg: string, error: any})`. 
+* `messageKey`: Overrides the key the textual message is placed in. Set this to "message" if you are using a Winston-like logger
+* `logLevels`: Overrides the level each event is logged at. For example, by default successful publishes are logged at `debug` level; you can change this to `info` with the following value: `{publishSuccess: 'info'}`. Supported keys are `subscribeSuccess`, `subscribeError`, `publishSuccess`, `publishError`, `handleSuccess`, `handleError`
 
 Source: [log.ts](./src/middleware/log.ts)
 
