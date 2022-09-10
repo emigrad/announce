@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.6.0](https://github.com/emigrad/announce/compare/v0.5.1...v0.6.0) (2022-09-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* log() now accepts its arguments as
+an object (the same as most other Announce functions)
+rather than receiving the logger instance
+as its first parameter
+* change BackendFactory to be a function
+* change Announce constructor to accept a single arg
+* middleware must now call the provided
+functions
+to register handler/subscriber/publish middleware
+instead of returning an object.
+* make amqplib an optional peer dependency
+* reverse middleware order
+
+### Features
+
+* change Announce constructor to accept a single arg ([e921239](https://github.com/emigrad/announce/commit/e921239d16a81ef62d02da91f279b8ec42bc987e))
+* change to MIT license ([6793ee6](https://github.com/emigrad/announce/commit/6793ee6b302e80580643e834fb6492db81f9f88b))
+* make middleware definitions more intuitive ([5fa0961](https://github.com/emigrad/announce/commit/5fa0961a154337c8a9ff1532518b71f18b9e8057))
+* support specifying logging levels and message key ([bdcbb39](https://github.com/emigrad/announce/commit/bdcbb39a1ca9bd1aee6e6ab426fe36bd1304dcf3))
+
+
+### Bug Fixes
+
+* export @types/promise-queue ([8b337a0](https://github.com/emigrad/announce/commit/8b337a0cb0c34a4e652134a1dc17509e59117254))
+
+
+* change BackendFactory to be a function ([cd5a8ca](https://github.com/emigrad/announce/commit/cd5a8ca8eed38b2c6200c3a379b099817e188710))
+* make amqplib an optional peer dependency ([da33aec](https://github.com/emigrad/announce/commit/da33aec52f5cc3d8cc502dd5fec0c6f12b776de1))
+* reverse middleware order ([917db3b](https://github.com/emigrad/announce/commit/917db3b5e9178467458a3bd907720d0a60357069))
+
 ### [0.5.1](https://gitlab.com/emigrad/announce/compare/v0.5.0...v0.5.1) (2022-05-02)
 
 
