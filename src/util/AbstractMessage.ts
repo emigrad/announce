@@ -3,7 +3,7 @@ import { MessageProperties, UnpublishedMessage } from '../types'
 /**
  * This is a utility class
  */
-export abstract class AbstractMessage<Body extends {}>
+export abstract class AbstractMessage<Body = unknown>
   implements UnpublishedMessage<Body>
 {
   public abstract topic: string

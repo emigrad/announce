@@ -44,26 +44,26 @@ export interface Middleware {
 }
 
 export interface PublishMiddleware {
-  (args: PublishMiddlewareArgs): Promise<void>
+  (args: PublishMiddlewareArgs): Promise<unknown>
 }
 export interface PublishMiddlewareArgs {
-  message: Message<any>
-  next: (message: Message<any>) => Promise<void>
+  message: Message
+  next: (message: Message) => Promise<unknown>
 }
 
 export interface SubscribeMiddleware {
-  (args: SubscribeMiddlewareArgs): Promise<void>
+  (args: SubscribeMiddlewareArgs): Promise<unknown>
 }
 export interface SubscribeMiddlewareArgs {
-  subscriber: Subscriber<any>
-  next: (subscriber: Subscriber<any>) => Promise<void>
+  subscriber: Subscriber
+  next: (subscriber: Subscriber) => Promise<unknown>
 }
 
 export interface HandleMiddleware {
-  (args: HandleMiddlewareArgs): Promise<void>
+  (args: HandleMiddlewareArgs): Promise<unknown>
 }
 export interface HandleMiddlewareArgs {
-  message: Message<any>
-  subscriber: Subscriber<any>
-  next: (message: Message<any>) => Promise<void>
+  message: Message
+  subscriber: Subscriber
+  next: (message: Message) => Promise<unknown>
 }

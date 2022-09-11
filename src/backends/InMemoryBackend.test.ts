@@ -137,7 +137,9 @@ describe('In memory backend', () => {
           messagesReceivedBySubscriberId[subscriberId]++
           dfds[subscriberId].resolve()
 
-          return new Promise(() => {})
+          return new Promise(() => {
+            // Never resolve
+          })
         }
       }
     }

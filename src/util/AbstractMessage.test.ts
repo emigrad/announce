@@ -24,6 +24,6 @@ describe('Abstract message', () => {
   })
 })
 
-class TestMessage extends AbstractMessage<any> {
+class TestMessage extends AbstractMessage {
   topic = 'test'
 }

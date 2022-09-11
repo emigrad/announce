@@ -23,13 +23,11 @@ export const batch: (args: BatchArgs) => Middleware =
       // We use a promise queue to ensure we never exceed the handler's
       // declared concurrency
       const promiseQueue = new PromiseQueue(concurrency)
-      let batchTimeout: NodeJS.Timeout | undefined
-      let batchMessages: Message<any>[] | undefined
-      let batchDeferred: Deferred<unknown> | undefined
+      let batch: Batch | undefined
 
       await next(getNextSubscriber())
 
-      function getNextSubscriber(): Subscriber<any> {
+      function getNextSubscriber(): Subscriber {
         return {
           ...subscriber,
           options: {
@@ -42,17 +40,19 @@ export const batch: (args: BatchArgs) => Middleware =
         }
       }
 
-      async function handle(message: Message<any>): Promise<unknown> {
-        if (!batchDeferred) {
-          batchDeferred = new Deferred()
-          batchTimeout = setTimeout(processBatch, maxTime)
-          batchMessages = []
+      async function handle(message: Message): Promise<unknown> {
+        if (!batch) {
+          batch = {
+            deferred: new Deferred(),
+            timeout: setTimeout(processBatch, maxTime),
+            messages: []
+          }
         }
 
-        const promise = batchDeferred.promise
-        batchMessages!.push(message)
+        const promise = batch.deferred.promise
+        batch.messages.push(message)
 
-        if (batchMessages!.length >= maxMessages) {
+        if (batch.messages.length >= maxMessages) {
           processBatch()
         }
 
@@ -60,16 +60,17 @@ export const batch: (args: BatchArgs) => Middleware =
       }
 
       function processBatch() {
-        const messages = batchMessages!
-        const deferred = batchDeferred!
-        clearTimeout(batchTimeout!)
+        if (!batch) {
+          return
+        }
 
-        batchDeferred = undefined
-        batchMessages = undefined
-        batchTimeout = undefined
+        const { timeout, messages, deferred } = batch
+        batch = undefined
+
+        clearTimeout(timeout)
 
         promiseQueue
-          .add(() =>
+          .add(async () =>
             subscriber.handle(
               getCompleteMessage(
                 createMessage(
@@ -88,3 +89,9 @@ export const batch: (args: BatchArgs) => Middleware =
       }
     })
   }
+
+interface Batch {
+  timeout: NodeJS.Timeout
+  messages: Message[]
+  deferred: Deferred<unknown>
+}

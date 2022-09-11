@@ -3,6 +3,7 @@
   "include": ["src/**/*.test.ts"],
   "exclude": [],
   "compilerOptions": {
-    "noEmit": true
+    "noEmit": true,
+    "esModuleInterop": true
   }
 }

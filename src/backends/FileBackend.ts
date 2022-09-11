@@ -1,3 +1,4 @@
+import assert from 'assert'
 import cuid from 'cuid'
 import {
   mkdir as mkdirCb,
@@ -181,7 +182,10 @@ export class FileBackend extends LocalBackend {
       await subscriber.handle(message)
     } catch (e) {
       if (hasDeadLetterTopic(subscriber)) {
-        await this.enqueue(message, getDeadLetterTopic(subscriber)!)
+        const deadLetterTopic = getDeadLetterTopic(subscriber)
+        assert(deadLetterTopic)
+
+        await this.enqueue(message, deadLetterTopic)
       }
     }
 

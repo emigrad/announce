@@ -13,12 +13,12 @@ export interface DelayArgs {
   variation?: number
 }
 
-export const withDelay: SubscriberWrapper<[DelayArgs], any> = (
+export const withDelay: SubscriberWrapper<[DelayArgs]> = (
   subscriber,
   { delay: delayMs, variation = 0 }
 ) => {
   const timers: Set<NodeJS.Timer> = new Set()
-  const rejects: Set<(...args: any[]) => any> = new Set()
+  const rejects: Set<(...args: unknown[]) => unknown> = new Set()
   let registeredClose = false
 
   return {
@@ -57,7 +57,7 @@ export const withDelay: SubscriberWrapper<[DelayArgs], any> = (
    * taking into account the amount of time that has elapsed between it
    * being sent and us receiving it
    */
-  function getDelay(message: Message<any>): number {
+  function getDelay(message: Message): number {
     const elapsed = Date.now() - +message.properties.date
     const actualDelay = Math.max(
       0,

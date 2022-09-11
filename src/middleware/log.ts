@@ -26,7 +26,7 @@ export interface LogArgs<Logger> {
  * A function on the logger that can be called to log an event
  */
 export interface LogFunction {
-  (details: Record<string, any>): unknown
+  (details: Record<string, unknown>): unknown
 }
 
 type LogFunctions<Logger> = {
@@ -137,6 +137,6 @@ export const log: <Logger>(args: LogArgs<Logger>) => Middleware = <Logger>({
   })
 }
 
-function getDuration(message: Message<any>): number {
+function getDuration(message: Message): number {
   return Date.now() - +new Date(message.headers[START_HEADER])
 }

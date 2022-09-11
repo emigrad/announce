@@ -3,14 +3,15 @@ import {
   Message,
   MessageProperties,
   UnpublishedMessage,
-  Subscriber
+  Subscriber,
+  BackendSubscriber
 } from '../types'
 
 /**
  * Creates a new message for publication. Some message details such as
  * the ID and publication date will be generated when the message is published.
  */
-export function createMessage<Body extends any>(
+export function createMessage<Body = unknown>(
   topic: string,
   body: Body,
   headers: Record<string, string> = {},
@@ -22,7 +23,7 @@ export function createMessage<Body extends any>(
 /**
  * Returns a complete message with a unique ID and publication date.
  */
-export function getCompleteMessage<Body extends any>(
+export function getCompleteMessage<Body = unknown>(
   message: UnpublishedMessage<Body>
 ): Message<Body> {
   return {
@@ -49,14 +50,18 @@ export function getCompleteProperties(
  * Returns how many messages the subscriber is allowed to simultaneously
  * process
  */
-export function getConcurrency(subscriber: Subscriber<any>): number {
+export function getConcurrency(
+  subscriber: Subscriber | BackendSubscriber
+): number {
   return subscriber.options?.concurrency ?? 1
 }
 
 /**
  * Returns true if the subscriber has a dead letter topic
  */
-export function hasDeadLetterTopic(subscriber: Subscriber<any>): boolean {
+export function hasDeadLetterTopic(
+  subscriber: Subscriber | BackendSubscriber
+): boolean {
   return subscriber.options?.preserveRejectedMessages !== false
 }
 
@@ -64,7 +69,9 @@ export function hasDeadLetterTopic(subscriber: Subscriber<any>): boolean {
  * Returns the name of the subscriber's dead letter topic, or null if
  * it doesn't have one
  */
-export function getDeadLetterTopic(subscriber: Subscriber<any>): string | null {
+export function getDeadLetterTopic(
+  subscriber: Subscriber | BackendSubscriber
+): string | null {
   return hasDeadLetterTopic(subscriber)
     ? `~rejected-${subscriber.queueName}`
     : null
@@ -74,7 +81,7 @@ export function getDeadLetterTopic(subscriber: Subscriber<any>): string | null {
  * Returns the name of the dead letter queue for the subscriber
  */
 export function getDeadLetterQueueName(
-  subscriber: Subscriber<any>
+  subscriber: Subscriber | BackendSubscriber
 ): string | null {
   return getDeadLetterTopic(subscriber)
 }
@@ -83,7 +90,7 @@ export function getDeadLetterQueueName(
  * Returns the value of the given header
  */
 export function getHeader(
-  message: Message<any>,
+  message: Message,
   header: string
 ): string | undefined {
   const headers = message.headers

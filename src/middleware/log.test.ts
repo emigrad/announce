@@ -37,7 +37,7 @@ describe('Logger middleware', () => {
       const error = new Error()
       backend.publish = jest.fn().mockRejectedValue(error)
 
-      await expect(announce.publish!(message)).rejects.toBe(error)
+      await expect(announce.publish(message)).rejects.toBe(error)
     }
 
     expect(logger[level as keyof Logger]).toHaveBeenCalled()
@@ -50,8 +50,10 @@ describe('Logger middleware', () => {
     const subscriber = {
       queueName: 'abc',
       topics: ['abc'],
-      handle: () => {}
-    } as Subscriber<any>
+      handle: () => {
+        // Do nothing
+      }
+    } as Subscriber
 
     if (succeeded) {
       await announce.subscribe(subscriber)
@@ -77,7 +79,7 @@ describe('Logger middleware', () => {
           throw error
         }
       }
-    } as Subscriber<any>
+    } as Subscriber
     const message = getCompleteMessage({
       topic: 'abc',
       body: null,

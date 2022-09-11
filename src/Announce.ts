@@ -119,6 +119,7 @@ export class Announce extends EventEmitter {
     return copy.use(...middlewares)
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async subscribe(...subscribers: Subscriber<any>[]): Promise<void> {
     await Promise.all(
       subscribers.map((subscriber) =>
@@ -127,7 +128,7 @@ export class Announce extends EventEmitter {
     )
   }
 
-  async publish<Body extends any = any>(
+  async publish<Body = unknown>(
     ...messages: UnpublishedMessage<Body>[]
   ): Promise<Message<Body>[]> {
     return Promise.all(
@@ -144,7 +145,9 @@ export class Announce extends EventEmitter {
     if (!this.closePromise) {
       this.closePromise = this.backend
         .close()
-        .catch(() => {})
+        .catch(() => {
+          // Squelch
+        })
         .then(() => {
           this.emit('close')
         })
@@ -153,20 +156,20 @@ export class Announce extends EventEmitter {
     return this.closePromise
   }
 
-  destroy(err: any) {
+  destroy(err: unknown) {
     this.emit('error', err)
     return this.close()
   }
 
-  private _subscribe(
-    subscriber: Subscriber<any>,
+  private async _subscribe(
+    subscriber: Subscriber,
     middlewares: readonly SubscribeMiddleware[]
   ): Promise<void> {
     const middleware = middlewares[middlewares.length - 1]
     const remainingMiddlewares = middlewares.slice(0, middlewares.length - 1)
 
     if (middleware) {
-      return middleware({
+      await middleware({
         subscriber,
         next: (newSubscriber) =>
           this._subscribe(newSubscriber, remainingMiddlewares)
@@ -177,15 +180,15 @@ export class Announce extends EventEmitter {
     }
   }
 
-  private _publish(
-    message: Message<any>,
+  private async _publish(
+    message: Message,
     middlewares: readonly PublishMiddleware[]
   ): Promise<void> {
     const middleware = middlewares[middlewares.length - 1]
     const remainingMiddlewares = middlewares.slice(0, middlewares.length - 1)
 
     if (middleware) {
-      return middleware({
+      await middleware({
         message,
         next: (newMessage) => this._publish(newMessage, remainingMiddlewares)
       })
@@ -213,7 +216,7 @@ function isValidTopicSelector(topicSelector: string) {
 /**
  * Throws an error if the subscriber is invalid for some reason
  */
-function validateSubscriber(subscriber: Subscriber<any>) {
+function validateSubscriber(subscriber: Subscriber) {
   const invalidTopics = subscriber.topics.filter(
     (topic) => !isValidTopicSelector(topic)
   )
@@ -224,7 +227,7 @@ function validateSubscriber(subscriber: Subscriber<any>) {
   }
 }
 
-function validateMessage(message: Message<any>) {
+function validateMessage(message: Message): asserts message is Message<Buffer> {
   if (!isValidTopic(message.topic)) {
     throw new Error(`Invalid topic: ${message.topic}`)
   } else if (!(message.body instanceof Buffer)) {
@@ -239,7 +242,7 @@ function validateMessage(message: Message<any>) {
  * one or more properties exists in the object's prototype chain rather than
  * on the object itself (eg subscribers that are classes)
  */
-function cloneSubscriber(subscriber: Subscriber<any>): Subscriber<any> {
+function cloneSubscriber(subscriber: Subscriber): Subscriber {
   return {
     queueName: subscriber.queueName,
     topics: subscriber.topics,

@@ -8,10 +8,10 @@ describe('spy middleware', () => {
     const announce = new Announce({ url: 'memory://' })
     const beforeSubscribe = jest.fn()
     const onSubscribe = jest.fn()
-    const subscriber: Subscriber<any> = {
+    const subscriber: Subscriber = {
       queueName: 'test',
       topics: ['test'],
-      handle: () => {}
+      handle: doNothing
     }
 
     announce.use(spy({ beforeSubscribe, onSubscribe }))
@@ -44,10 +44,10 @@ describe('spy middleware', () => {
   it('Should notify of failed subscriptions', async () => {
     const announce = new Announce({ url: 'memory://' })
     const onSubscribeError = jest.fn()
-    const subscriber: Subscriber<any> = {
+    const subscriber: Subscriber = {
       queueName: 'test',
       topics: ['test'],
-      handle: () => {}
+      handle: doNothing
     }
     const error = new Error('Oh no')
 
@@ -109,10 +109,10 @@ describe('spy middleware', () => {
     const announce = new Announce({ url: 'memory://' })
     const beforeHandle = jest.fn()
     const onHandle = jest.fn()
-    const subscriber: Subscriber<any> = {
+    const subscriber: Subscriber = {
       queueName: 'test',
       topics: ['test'],
-      handle: () => {}
+      handle: doNothing
     }
     const message = getCompleteMessage(
       createMessage(subscriber.topics[0], Buffer.from(''))
@@ -152,7 +152,7 @@ describe('spy middleware', () => {
     const announce = new Announce({ url: 'memory://' })
     const onHandleError = jest.fn()
     const error = new Error('Oh no')
-    const subscriber: Subscriber<any> = {
+    const subscriber: Subscriber = {
       queueName: 'test',
       topics: ['test'],
       handle: () => {
@@ -183,3 +183,7 @@ describe('spy middleware', () => {
     )
   })
 })
+
+function doNothing() {
+  // Do nothing
+}

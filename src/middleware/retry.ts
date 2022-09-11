@@ -18,7 +18,7 @@ interface RetryArgs {
    * A function to determine whether a message should be retried. If it returns
    * false, the message will be permanently rejected
    */
-  canRetry?: (error: any, message: Message<any>) => boolean
+  canRetry?: (error: unknown, message: Message) => boolean
 }
 
 export const retry = ({
@@ -69,8 +69,8 @@ export const retry = ({
      * Creates the queues for the messages that need to be retried
      */
     async function createRetryQueues(
-      subscriber: Subscriber<any>,
-      next: (subscriber: Subscriber<any>) => Promise<void>
+      subscriber: Subscriber,
+      next: (subscriber: Subscriber) => Promise<unknown>
     ) {
       if (!initializedQueues.includes(subscriber.queueName)) {
         for (let retry = 1; retry <= maxRetries; retry++) {
@@ -85,9 +85,9 @@ export const retry = ({
      * Creates an individual retry queue
      */
     async function createRetryQueue(
-      subscriber: Subscriber<any>,
+      subscriber: Subscriber,
       retryNum: number,
-      next: (subscriber: Subscriber<any>) => Promise<void>
+      next: (subscriber: Subscriber) => Promise<unknown>
     ) {
       await next(
         withDelay(
@@ -100,10 +100,7 @@ export const retry = ({
     /**
      * Queues the message in the appropriate retry queue
      */
-    async function retryMessage(
-      subscriber: Subscriber<any>,
-      message: Message<any>
-    ) {
+    async function retryMessage(subscriber: Subscriber, message: Message) {
       const nextRetry = getNumRetries(message) + 1
 
       // We need to override the topic to our retry queue, but we store
@@ -131,9 +128,9 @@ export const retry = ({
      * Returns a subscriber for retrying messages
      */
     function getRetrySubscriber(
-      subscriber: Subscriber<any>,
+      subscriber: Subscriber,
       retryNum: number
-    ): Subscriber<any> {
+    ): Subscriber {
       const name = getRetryTopic(subscriber, retryNum)
 
       return {
@@ -172,20 +169,20 @@ export const retry = ({
 /**
  * Returns the message's actual topic
  */
-function getTopic(message: Message<any>): string {
+function getTopic(message: Message): string {
   return message.headers[TOPIC_HEADER] ?? message.topic
 }
 
 /**
  * Returns the topic to publish retry messages to
  */
-function getRetryTopic(subscriber: Subscriber<any>, retryNum: number) {
+function getRetryTopic(subscriber: Subscriber, retryNum: number) {
   return `~retry.${subscriber.queueName}.${retryNum}`
 }
 
 /**
  * Returns the number of retry attempts this message has had
  */
-function getNumRetries(message: Message<any>): number {
+function getNumRetries(message: Message): number {
   return +(message.headers[RETRIES_HEADER] ?? '0')
 }

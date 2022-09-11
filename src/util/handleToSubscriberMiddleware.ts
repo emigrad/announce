@@ -13,7 +13,8 @@ export function handleToSubscriberMiddleware(
         await handleMiddleware({
           message,
           subscriber,
-          next: (message) => origHandle.call(subscriber, message, handlerArgs)
+          next: async (message) =>
+            origHandle.call(subscriber, message, handlerArgs)
         })
       }
     })

@@ -1,69 +1,67 @@
 import { Announce } from '../Announce'
 import { Message, Middleware, Subscriber } from '../types'
 
-const doNothing = () => {}
-
 export interface PublishDetails {
   announce: Announce
-  message: Message<any>
+  message: Message
 }
 
 export interface SubscribeDetails {
   announce: Announce
-  subscriber: Subscriber<any>
+  subscriber: Subscriber
 }
 
 export interface HandleDetails {
   announce: Announce
-  message: Message<any>
-  subscriber: Subscriber<any>
+  message: Message
+  subscriber: Subscriber
 }
 
 export interface SpyArgs {
   /**
    * Called whenever a message is about to be published
    */
-  beforePublish?: (details: PublishDetails) => any
+  beforePublish?: (details: PublishDetails) => unknown
 
   /**
    * Notification that a message has been successfully published
    */
-  onPublish?: (details: PublishDetails) => any
+  onPublish?: (details: PublishDetails) => unknown
 
   /**
    * Notification that publishing failed
    */
-  onPublishError?: (details: PublishDetails & { error: any }) => any
+  onPublishError?: (details: PublishDetails & { error: unknown }) => unknown
 
   /**
    * Called before a subscriber is added
    */
-  beforeSubscribe?: (details: SubscribeDetails) => any
+  beforeSubscribe?: (details: SubscribeDetails) => unknown
 
   /**
    * Notification that a subscriber was successfully added
    */
-  onSubscribe?: (details: SubscribeDetails) => any
+  onSubscribe?: (details: SubscribeDetails) => unknown
 
   /**
    * Notification that adding a subscriber failed
    */
-  onSubscribeError?: (details: SubscribeDetails & { error: any }) => any
+  onSubscribeError?: (details: SubscribeDetails & { error: unknown }) => unknown
 
   /**
    * Called before a message is handled
    */
-  beforeHandle?: (details: HandleDetails) => any
+  beforeHandle?: (details: HandleDetails) => unknown
 
   /**
    * Notification that a message has been successfully handled
    */
-  onHandle?: (details: HandleDetails) => any
+  onHandle?: (details: HandleDetails) => unknown
 
   /**
    * Notification that a message was rejected by the handler
    */
-  onHandleError?: (details: HandleDetails & { error: any }) => any
+  onHandleError?: (details: HandleDetails & { error: unknown }) => unknown
 }
 
 /**
@@ -125,4 +123,8 @@ export function spy(listeners: SpyArgs): Middleware {
       }
     })
   }
+}
+
+function doNothing() {
+  // Do nothing
 }

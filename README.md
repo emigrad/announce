@@ -144,7 +144,7 @@ In general it's recommended that all processing of rejected messages be done by 
 ```typescript
 import { Subscriber } from './Subscriber'
 
-const failingSubscriber: Subscriber<any> = {
+const failingSubscriber: Subscriber = {
   queueName: "example",
   topics: ["example"],
   handle() {
@@ -159,7 +159,7 @@ You can subscribe to its rejected messages by creating another subscriber:
 import { getDeadLetterTopic } from './message'
 import { Subscriber } from './Subscriber'
 
-const rejectedMessageSubscriber: Subscriber<any> = {
+const rejectedMessageSubscriber: Subscriber = {
   queueName: "rejected-messages",
   topics: [getDeadLetterTopic(failingSubscriber)],
   handle() {
@@ -176,7 +176,7 @@ It is not recommended, but you can also consume those messages directly if neede
 import { getDeadLetterQueueName, getDeadLetterTopic } from './message'
 import { Subscriber } from './Subscriber'
 
-const rejectedMessageSubscriber: Subscriber<any> = {
+const rejectedMessageSubscriber: Subscriber = {
   queueName: getDeadLetterQueueName(failingSubscriber),
   topics: [getDeadLetterTopic(failingSubscriber)],
   handle() {

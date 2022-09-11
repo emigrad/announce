@@ -25,8 +25,8 @@ describe('delay middware', () => {
       queueName: 'fred',
       topics: ['abc'],
       options: { concurrency: 5 }
-    } as Subscriber<any>
-    let subscribeMiddleware: SubscribeMiddleware
+    } as Subscriber
+    let subscribeMiddleware!: SubscribeMiddleware
 
     delay({ delay: delayMs })({
       announce,
@@ -35,7 +35,7 @@ describe('delay middware', () => {
       }
     } as MiddlewareArgs)
 
-    expect(await subscribeMiddleware!({ subscriber, next })).toBe(nextResult)
+    expect(await subscribeMiddleware({ subscriber, next })).toBe(nextResult)
     expect(next).toHaveBeenCalledWith(expect.objectContaining(subscriber))
   })
 
@@ -56,9 +56,9 @@ describe('delay middware', () => {
         handle: () => {
           handlerCalled = true
         }
-      } as Subscriber<any>
-      let wrappedSubscriber: Subscriber<any>
-      let subscribeMiddleware: SubscribeMiddleware
+      } as Subscriber
+      let wrappedSubscriber!: Subscriber
+      let subscribeMiddleware!: SubscribeMiddleware
 
       delay({ delay: delayMs })({
         announce,
@@ -72,13 +72,13 @@ describe('delay middware', () => {
         return Promise.resolve()
       })
 
-      await subscribeMiddleware!({ subscriber, next })
+      await subscribeMiddleware({ subscriber, next })
 
-      const handlePromise = wrappedSubscriber!
-        .handle(message, { announce })
-        .then(() => {
-          promiseResolved = true
-        })
+      const handlePromise = (
+        wrappedSubscriber.handle(message, { announce }) as Promise<unknown>
+      ).then(() => {
+        promiseResolved = true
+      })
 
       // Give the system a chance to run the handler if it wants to
       jest.advanceTimersByTime(Math.max(0, delayMs - elapsed - 1))
@@ -100,11 +100,11 @@ describe('delay middware', () => {
   )
 
   it('Should not call handlers after announce instance has closed', async () => {
-    let listener: () => any
-    announce.on = ((event: string, _listener: () => any) => {
+    let listener!: () => unknown
+    announce.on = ((event: string, _listener: () => unknown) => {
       expect(event).toBe('close')
       listener = _listener
-    }) as any
+    }) as Announce['on']
     const message = getCompleteMessage({ topic: 'abc', body: {} })
 
     let handlerCalled = false
@@ -114,15 +114,14 @@ describe('delay middware', () => {
       handle: () => {
         handlerCalled = true
       }
-    } as Subscriber<any>
-    let wrappedSubscriber: Subscriber<any>
+    } as Subscriber
+    let wrappedSubscriber!: Subscriber
+    let subscribeMiddleware!: SubscribeMiddleware
 
     const next = jest.fn((_subscriber) => {
       wrappedSubscriber = _subscriber
       return Promise.resolve()
     })
-
-    let subscribeMiddleware: SubscribeMiddleware
 
     delay({ delay: 100 })({
       announce,
@@ -131,10 +130,10 @@ describe('delay middware', () => {
       }
     } as MiddlewareArgs)
 
-    await subscribeMiddleware!({ subscriber, next })
-    const handlePromise = wrappedSubscriber!.handle(message, { announce })
+    await subscribeMiddleware({ subscriber, next })
+    const handlePromise = wrappedSubscriber.handle(message, { announce })
 
-    listener!()
+    listener()
 
     await expect(handlePromise).rejects.toBeDefined()
     expect(handlerCalled).toBe(false)
@@ -158,14 +157,14 @@ describe('delay middware', () => {
       promises.push(
         subscriber.handle(getCompleteMessage({ topic: 'abc', body: 'abc' }), {
           announce
-        })
+        }) as Promise<void>
       )
     }
 
     jest.advanceTimersByTime(delayMs * 2)
     await Promise.all(promises)
 
-    const delays = spy.mock.calls.map((args: any) => args[1])
+    const delays = spy.mock.calls.map((args: unknown[]) => args[1] as number)
     const minDelay = Math.min(...delays)
     const maxDelay = Math.max(...delays)
 

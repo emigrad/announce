@@ -22,7 +22,7 @@ export const json: () => Middleware =
       if (getHeader(message, 'Content-Type') === 'application/json') {
         return next({
           ...message,
-          body: JSON.parse(message.body.toString())
+          body: JSON.parse(String(message.body))
         })
       } else {
         return next(message)

@@ -1,7 +1,9 @@
 import { Channel, ConfirmChannel, Connection } from 'amqplib'
 import { ConsumeMessage, Options } from 'amqplib/properties'
+import assert from 'assert'
 import cuid from 'cuid'
 import { EventEmitter } from 'events'
+import { Backend, BackendSubscriber, Message } from '../types'
 import {
   getConcurrency,
   getDeadLetterQueueName,
@@ -9,7 +11,6 @@ import {
   getHeader,
   hasDeadLetterTopic
 } from '../util'
-import { Backend, BackendSubscriber, Message, Subscriber } from '../types'
 
 const dateHeader = 'x-announce-date'
 
@@ -29,8 +30,8 @@ export interface RabbitMQOptions {
 export class RabbitMQBackend extends EventEmitter implements Backend {
   private readonly exchange: string
   private readonly subscribers: BackendSubscriber[]
-  private readonly subscriberChannels: Record<number, PromiseLike<Channel>>
-  private readonly rebuildPromises: Record<number, PromiseLike<any>>
+  private readonly subscriberChannels: Record<string, PromiseLike<Channel>>
+  private readonly rebuildPromises: Record<number, PromiseLike<unknown>>
   private connection: PromiseLike<Connection>
   private publishChannel: PromiseLike<ConfirmChannel> | undefined
   private closePromise: Promise<void> | undefined
@@ -105,10 +106,12 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
       // Prevent any attempts to publish messages or add subscribers
       this.connection = Promise.reject('Connection has been closed')
       // Avoid Node complaining about unhanded rejections
-      this.connection.then(null, () => {})
+      this.connection.then(null, () => {
+        // Squelch
+      })
 
       Object.keys(this.subscriberChannels).map(
-        (key) => delete this.subscriberChannels[key as any]
+        (key) => delete this.subscriberChannels[key]
       )
 
       this.closePromise = (async () => {
@@ -185,7 +188,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     await channel.assertExchange(this.exchange, 'topic')
   }
 
-  private async createQueue(subscriber: Subscriber<Buffer>): Promise<void> {
+  private async createQueue(subscriber: BackendSubscriber): Promise<void> {
     const channel = await this.getChannelForSubscriber(subscriber)
     const options = this.getQueueOptions(subscriber)
 
@@ -193,8 +196,10 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     await channel.assertQueue(subscriber.queueName, options)
 
     if (hasDeadLetterTopic(subscriber)) {
-      const deadLetterQueue = getDeadLetterQueueName(subscriber)!
-      const deadLetterTopic = getDeadLetterTopic(subscriber)!
+      const deadLetterQueue = getDeadLetterQueueName(subscriber)
+      const deadLetterTopic = getDeadLetterTopic(subscriber)
+      assert(deadLetterQueue)
+      assert(deadLetterTopic)
 
       await channel.assertQueue(deadLetterQueue, { durable: true })
       await channel.bindQueue(deadLetterQueue, this.exchange, deadLetterTopic)
@@ -245,7 +250,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
   }
 
   private async getChannelForSubscriber(
-    subscriber: Subscriber<Buffer>
+    subscriber: BackendSubscriber
   ): Promise<Channel> {
     return this.getChannelForConcurrency(getConcurrency(subscriber))
   }
@@ -274,12 +279,15 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     )
   }
 
-  private getQueueOptions(subscriber: Subscriber<Buffer>): Options.AssertQueue {
+  private getQueueOptions(subscriber: BackendSubscriber): Options.AssertQueue {
     const options: Options.AssertQueue = { durable: true }
 
     if (hasDeadLetterTopic(subscriber)) {
+      const deadLetterRoutingKey = getDeadLetterTopic(subscriber)
+      assert(deadLetterRoutingKey)
+
       options.deadLetterExchange = this.exchange
-      options.deadLetterRoutingKey = getDeadLetterTopic(subscriber)!
+      options.deadLetterRoutingKey = deadLetterRoutingKey
     }
 
     return options

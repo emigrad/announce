@@ -39,8 +39,8 @@ describe('retry middleware', () => {
   })
 
   it('Should not retry successful messages', async () => {
-    const spyDfd = new Deferred<any>()
-    const handleDfd = new Deferred<Message<any>>()
+    const spyDfd = new Deferred()
+    const handleDfd = new Deferred<Message>()
     const announce = new Announce({ url: 'memory://' })
     announce.use(
       spy({ onHandle: spyDfd.resolve, onHandleError: spyDfd.reject }),
@@ -62,8 +62,8 @@ describe('retry middleware', () => {
 
   it('Should retry failed messages up to maxRetries', async () => {
     const maxRetries = 2
-    const receivedMessages: Message<any>[] = []
-    const spyDfd = new Deferred<void>()
+    const receivedMessages: Message[] = []
+    const spyDfd = new Deferred<unknown>()
     const announce = new Announce({ url: 'memory://' })
     const error = new Error('Oh no')
     announce.use(
@@ -87,10 +87,10 @@ describe('retry middleware', () => {
   })
 
   it('Should not retry failures if canRetry() returns false', async () => {
-    const spyDfd = new Deferred<any>()
+    const spyDfd = new Deferred()
     const announce = new Announce({ url: 'memory://' })
     const canRetry = jest.fn().mockReturnValue(false)
-    const receivedMessages: Message<any>[] = []
+    const receivedMessages: Message[] = []
     const error = new Error()
     announce.use(
       spy({ onHandleError: ({ error }) => spyDfd.resolve(error) }),
@@ -113,16 +113,16 @@ describe('retry middleware', () => {
 
   it('Should not subscribe to the retry queues multiple times for equivalent subscribers', async () => {
     const announce = new Announce({ url: 'memory://' })
-    const subscribers: Subscriber<any>[] = []
+    const subscribers: Subscriber[] = []
 
     announce.use(
       spy({ onSubscribe: ({ subscriber }) => subscribers.push(subscriber) }),
       retry()
     )
-    const subscriber1: Subscriber<any> = {
+    const subscriber1: Subscriber = {
       queueName: 'test',
       topics: ['test'],
-      handle: () => {},
+      handle: doNothing,
       options: {
         concurrency: 1
       }
@@ -139,8 +139,8 @@ describe('retry middleware', () => {
 
   it('Should set the current date when publishing messages to the delay queues', async () => {
     const messageDate = new Date()
-    const receivedMessages: Message<any>[] = []
-    const retryMessages: Message<any>[] = []
+    const receivedMessages: Message[] = []
+    const retryMessages: Message[] = []
     const spyDfd = new Deferred<void>()
     const announce = new Announce({ url: 'memory://' })
     announce.use(
@@ -182,3 +182,7 @@ describe('retry middleware', () => {
     })
   })
 })
+
+function doNothing() {
+  // Do nothing
+}

@@ -11,10 +11,12 @@ describe('Message utils', () => {
   const body = { hi: 'there' }
   const headers = { 'Content-Type': 'blah' }
   const properties = { id: '123', date: new Date() }
-  const subscriber: Subscriber<any> = {
+  const subscriber: Subscriber = {
     queueName: 'blah',
     topics: ['*'],
-    handle: () => {}
+    handle: () => {
+      // Do nothing
+    }
   }
 
   test('createMessage()', () => {

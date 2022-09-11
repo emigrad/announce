@@ -1,8 +1,8 @@
 import { Announce } from '../Announce'
 import { Message } from './Message'
 
-export interface Handler<Body extends any> {
-  (message: Message<Body>, args: HandlerArgs): any | Promise<any>
+export interface Handler<Body = unknown> {
+  (message: Message<Body>, args: HandlerArgs): unknown | Promise<unknown>
 }
 
 export interface HandlerArgs {

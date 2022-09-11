@@ -1,4 +1,4 @@
-export interface UnpublishedMessage<Body extends any> {
+export interface UnpublishedMessage<Body = unknown> {
   /** The topic of the message. Must be a dotted string */
   topic: string
   /** The actual data. Must be JSON-serialisable */
@@ -9,7 +9,7 @@ export interface UnpublishedMessage<Body extends any> {
   properties?: Partial<MessageProperties>
 }
 
-export interface Message<Body extends any>
+export interface Message<Body = unknown>
   extends Required<UnpublishedMessage<Body>> {
   /** The message's metadata */
   properties: MessageProperties

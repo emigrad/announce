@@ -5,7 +5,7 @@ import rimrafCb from 'rimraf'
 import { Deferred } from 'ts-deferred'
 import { promisify } from 'util'
 import { BackendSubscriber, Message } from '../types'
-import { createMessage, getCompleteMessage } from '../util'
+import { createMessage, getCompleteMessage, getConcurrency } from '../util'
 import { FileBackend } from './FileBackend'
 
 const rimraf = promisify(rimrafCb)
@@ -94,7 +94,7 @@ describe('File backend', () => {
       queueName: 'test',
       topics: ['foo'],
       handle: async ({ body }) => {
-        expect(numRunning).toBeLessThan(subscriber.options?.concurrency!)
+        expect(numRunning).toBeLessThan(getConcurrency(subscriber))
         numRunning++
         maxRunning = Math.max(maxRunning, numRunning)
 
@@ -122,7 +122,10 @@ describe('File backend', () => {
     const subscriber1: BackendSubscriber = {
       queueName: 'test',
       topics: ['foo.bar'],
-      handle: () => new Promise(() => {})
+      handle: () =>
+        new Promise(() => {
+          // Never resolve
+        })
     }
     const subscriber2: BackendSubscriber = {
       queueName: 'test',

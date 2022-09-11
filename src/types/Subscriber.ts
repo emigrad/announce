@@ -14,7 +14,7 @@ export interface SubscriberOptions {
   preserveRejectedMessages?: boolean
 }
 
-export interface Subscriber<Body extends any> {
+export interface Subscriber<Body = unknown> {
   /** The name of the subscriber. Must be a globally unique dotted string */
   queueName: string
 

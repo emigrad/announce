@@ -9,7 +9,7 @@ import { getCompleteMessage, getHeader } from '../util'
 import { json } from './json'
 
 describe('json middleware', () => {
-  const subscriber = {} as Subscriber<any>
+  const subscriber = {} as Subscriber
   let publishMiddleware: PublishMiddleware
   let handleMiddleware: HandleMiddleware
 
@@ -27,15 +27,15 @@ describe('json middleware', () => {
   it('Should stringify messages that are not Buffers', async () => {
     const nextResult = '55'
     const next = jest.fn().mockResolvedValue(nextResult)
-    const message = { body: { hi: 'there' } } as Message<any>
+    const message = { body: { hi: 'there' } } as Message
 
-    expect(await publishMiddleware!({ message, next })).toBe(nextResult)
+    expect(await publishMiddleware({ message, next })).toBe(nextResult)
     expect(JSON.parse(next.mock.calls[0][0].body.toString())).toEqual(
       message.body
     )
-    expect(
-      getHeader(next.mock.calls[0][0] as Message<any>, 'Content-Type')
-    ).toBe('application/json')
+    expect(getHeader(next.mock.calls[0][0] as Message, 'Content-Type')).toBe(
+      'application/json'
+    )
   })
 
   it('Should not stringify messages with a Buffer body', async () => {
@@ -44,12 +44,12 @@ describe('json middleware', () => {
     const message = {
       body: Buffer.from('hi there'),
       headers: {}
-    } as Message<any>
+    } as Message
 
-    expect(await publishMiddleware!({ message, next })).toBe(nextResult)
+    expect(await publishMiddleware({ message, next })).toBe(nextResult)
     expect(next).toHaveBeenCalledWith(message)
     expect(
-      getHeader(next.mock.calls[0][0] as Message<any>, 'Content-Type')
+      getHeader(next.mock.calls[0][0] as Message, 'Content-Type')
     ).not.toBeDefined()
   })
 
@@ -63,7 +63,7 @@ describe('json middleware', () => {
       headers: { 'content-type': 'application/json' }
     })
 
-    expect(await handleMiddleware!({ message, next, subscriber })).toBe(
+    expect(await handleMiddleware({ message, next, subscriber })).toBe(
       nextResult
     )
     expect(next.mock.calls[0][0].body).toEqual(body)
@@ -80,7 +80,7 @@ describe('json middleware', () => {
         headers: { 'content-type': contentType as string }
       })
 
-      expect(await handleMiddleware!({ message, next, subscriber })).toBe(
+      expect(await handleMiddleware({ message, next, subscriber })).toBe(
         nextResult
       )
       expect(next).toHaveBeenCalledWith(message)

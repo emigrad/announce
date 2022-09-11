@@ -22,8 +22,10 @@ describe('batch', () => {
     rejectedMessages = []
     announce = new Announce({ url: 'memory://' }).use(
       spy({
-        onHandle: ({ message }) => acknowledgedMessages.push(message),
-        onHandleError: ({ message }) => rejectedMessages.push(message),
+        onHandle: ({ message }) =>
+          acknowledgedMessages.push(message as Message<Buffer>),
+        onHandleError: ({ message }) =>
+          rejectedMessages.push(message as Message<Buffer>),
         onSubscribe: ({ subscriber }) => {
           if (subscriber.queueName === 'test') {
             expect(subscriber.options?.concurrency).toBe(
@@ -38,7 +40,7 @@ describe('batch', () => {
     await announce.subscribe({
       topics: ['test'],
       queueName: 'test',
-      handle: (message: Message<Message<any>[]>) => {
+      handle: (message: Message<Message<Buffer>[]>) => {
         receivedBatches.push(message)
       },
       options: { concurrency }

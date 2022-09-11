@@ -1,18 +1,19 @@
-import { Channel, ConfirmChannel, connect, Connection } from 'amqplib'
+import { Channel, connect, Connection } from 'amqplib'
 import { ConsumeMessage } from 'amqplib/properties'
+import assert from 'assert'
 import { config } from 'dotenv-flow'
 import { Deferred } from 'ts-deferred'
 import { BackendSubscriber, Message } from '../types'
 import {
   createMessage,
   getCompleteMessage,
-  getDeadLetterTopic,
+  getDeadLetterQueueName,
   getHeader
 } from '../util'
 import { RabbitMQBackend } from './RabbitMQBackend'
 
 config({ silent: true, purge_dotenv: true })
-const url = process.env.RABBITMQ_URL!
+const url = process.env.RABBITMQ_URL ?? ''
 
 describe('RabbitMQ Backend', () => {
   let connection: Connection
@@ -123,8 +124,9 @@ describe('RabbitMQ Backend', () => {
         throw new Error()
       }
     }
+    const deadLetterQueueName = getDeadLetterQueueName(subscriber) as string
     const dlqSubscriber: BackendSubscriber = {
-      queueName: getDeadLetterTopic(subscriber)!,
+      queueName: deadLetterQueueName,
       topics: [],
       handle: dfd.resolve,
       options: { preserveRejectedMessages: false }
@@ -268,8 +270,8 @@ describe('RabbitMQ Backend', () => {
 
     await rabbitMq.publish(getCompleteMessage({ topic, body }))
 
-    const publishChannel = await (rabbitMq as any).publishChannel
-    await publishChannel.close()
+    const publishChannel = await rabbitMq['publishChannel']
+    await publishChannel?.close()
 
     await expect(
       rabbitMq.publish(getCompleteMessage({ topic, body }))
@@ -324,7 +326,7 @@ describe('RabbitMQ Backend', () => {
       })
     )
 
-    const connection = await (rabbitMq as any).connection
+    const connection = await rabbitMq['connection']
     connection.emit('error', error)
 
     expect(await dfd.promise).toBe(error)
@@ -396,9 +398,9 @@ describe('RabbitMQ Backend', () => {
       })
     )
 
-    const receivedMessage = (await dfd.promise)!
+    const receivedMessage = await dfd.promise
 
-    expect(receivedMessage.properties).toMatchObject({
+    expect(receivedMessage?.properties).toMatchObject({
       contentType,
       contentEncoding
     })
@@ -445,9 +447,9 @@ describe('RabbitMQ Backend', () => {
 
     // Force the backend to create the channel
     await rabbitMq.subscribe(createSubscriber(0))
-    const subscribeChannel = (await Object.values(
-      (rabbitMq as any).subscriberChannels
-    )[0]) as Channel
+    const subscribeChannel = await Object.values(
+      rabbitMq['subscriberChannels']
+    )[0]
 
     const consumeSpy = jest.spyOn(subscribeChannel, 'consume')
     const origClose = subscribeChannel.close
@@ -455,14 +457,14 @@ describe('RabbitMQ Backend', () => {
     subscribeChannel.close = jest.fn(async () => {
       await origClose.call(subscribeChannel)
       closedDfd.resolve()
-    }) as any
+    }) as unknown as Channel['close']
     const closeSpy = jest.spyOn(subscribeChannel, 'close')
 
     // Add two more subscribers - we're going to send null messages to them both
     await rabbitMq.subscribe(createSubscriber(1))
     await rabbitMq.subscribe(createSubscriber(2))
 
-    const consumers = consumeSpy.mock.calls.map(([_, consumer]) => consumer)
+    const consumers = consumeSpy.mock.calls.map((call) => call[1])
     consumers.forEach((consumer) => consumer(null))
 
     await closedDfd.promise
@@ -495,9 +497,9 @@ describe('RabbitMQ Backend', () => {
 
     // Force the backend to create the channel
     await rabbitMq.subscribe(createSubscriber(0))
-    const subscribeChannel = (await Object.values(
-      (rabbitMq as any).subscriberChannels
-    )[0]) as Channel
+    const subscribeChannel = await Object.values(
+      rabbitMq['subscriberChannels']
+    )[0]
 
     const consumeSpy = jest.spyOn(subscribeChannel, 'consume')
     const origClose = subscribeChannel.close
@@ -505,14 +507,14 @@ describe('RabbitMQ Backend', () => {
     subscribeChannel.close = jest.fn(async () => {
       await origClose.call(subscribeChannel)
       closedDfd.resolve()
-    }) as any
+    }) as unknown as Channel['close']
     const closeSpy = jest.spyOn(subscribeChannel, 'close')
 
     // Add two more subscribers - we're going to send null messages to them both
     await rabbitMq.subscribe(createSubscriber(1))
     await rabbitMq.subscribe(createSubscriber(2))
 
-    const consumers = consumeSpy.mock.calls.map(([_, consumer]) => consumer)
+    const consumers = consumeSpy.mock.calls.map((callArgs) => callArgs[1])
     const closePromise = rabbitMq.close()
     consumers.forEach((consumer) => consumer(null))
 
@@ -535,15 +537,16 @@ describe('RabbitMQ Backend', () => {
     await rabbitMq.publish(
       getCompleteMessage({ topic: 'hi', body: Buffer.from('') })
     )
-    const publishChannel = (await (rabbitMq as any)
-      .publishChannel)! as ConfirmChannel
+    const publishChannel = await rabbitMq['publishChannel']
+    assert(publishChannel)
+
     publishChannel.publish = jest.fn(
       (
-        _: any,
-        __: any,
-        ___: any,
-        ____: any,
-        callback: (err: any, ok: any) => void
+        _: unknown,
+        __: unknown,
+        ___: unknown,
+        ____: unknown,
+        callback: (err: unknown, ok: unknown) => void
       ) => {
         callback(error, null)
 
@@ -559,4 +562,6 @@ describe('RabbitMQ Backend', () => {
   })
 })
 
-function squelch() {}
+function squelch() {
+  // Do nothing
+}

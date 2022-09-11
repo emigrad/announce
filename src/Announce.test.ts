@@ -14,7 +14,7 @@ describe('Announce', () => {
   it.each(['***', ' hello', '..foo', '.bar', 'bar.', 'something-else'])(
     'Should reject subscribers that listen to invalid topic %p',
     async (topic) => {
-      const subscriber: Subscriber<any> = {
+      const subscriber: Subscriber = {
         queueName: 'test',
         topics: [topic],
         handle: jest.fn()
@@ -46,7 +46,7 @@ describe('Announce', () => {
   it('Should pass subscriptions onto the backend, after applying middleware', async () => {
     const dfd = new Deferred<[string, Error]>()
     const error = new Error('no')
-    const subscriber: Subscriber<any> = {
+    const subscriber: Subscriber = {
       queueName: 'test',
       topics: ['foo'],
       handle: jest.fn().mockRejectedValue(error)
@@ -74,7 +74,7 @@ describe('Announce', () => {
     await announce.subscribe({
       queueName: 'test',
       topics: ['test'],
-      handle(message: Message<any>) {
+      handle(message: Message) {
         dfd.resolve(message)
       }
     })
@@ -187,8 +187,8 @@ describe('Announce', () => {
     // This should succeed because we have the JSON middleware
     await jsonAnnounce.publish(message)
 
-    expect(((await rawDfd.promise) as Message<any>).body).toBeInstanceOf(Buffer)
-    expect(((await jsonDfd.promise) as Message<any>).body).toEqual(message.body)
+    expect(((await rawDfd.promise) as Message).body).toBeInstanceOf(Buffer)
+    expect(((await jsonDfd.promise) as Message).body).toEqual(message.body)
 
     // The base announce's middleware should have been called after the
     // json announce's middleware since it was defined first and we're publishing, therefore
@@ -253,13 +253,13 @@ describe('Announce', () => {
     const announce = new Announce({ url: 'memory://' })
     announce.use((_args) => (args = _args))
 
-    expect(() => args.addSubscribeMiddleware(async () => {})).toThrowError(
+    expect(() => args.addSubscribeMiddleware(doNothing)).toThrowError(
       "addSubscribeMiddleware() must be called from inside the middleware function, it can't be called after it has returned"
     )
-    expect(() => args.addPublishMiddleware(async () => {})).toThrowError(
+    expect(() => args.addPublishMiddleware(doNothing)).toThrowError(
       "addPublishMiddleware() must be called from inside the middleware function, it can't be called after it has returned"
     )
-    expect(() => args.addHandleMiddleware(async () => {})).toThrowError(
+    expect(() => args.addHandleMiddleware(doNothing)).toThrowError(
       "addHandleMiddleware() must be called from inside the middleware function, it can't be called after it has returned"
     )
   })
@@ -268,7 +268,7 @@ describe('Announce', () => {
 class TestSubscriber implements Subscriber<Buffer> {
   topics = ['test.test']
   queueName = 'test'
-  dfd: Deferred<any>
+  dfd: Deferred<unknown>
 
   constructor() {
     this.dfd = new Deferred()
@@ -277,4 +277,8 @@ class TestSubscriber implements Subscriber<Buffer> {
   handle(message: Message<Buffer>) {
     this.dfd.resolve(message)
   }
+}
+
+async function doNothing() {
+  //Do nothing
 }
