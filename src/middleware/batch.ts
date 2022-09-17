@@ -1,3 +1,4 @@
+import assert from 'assert'
 import PromiseQueue from 'promise-queue'
 import { Deferred } from 'ts-deferred'
 import { Message, Middleware, Subscriber } from '../types'
@@ -60,10 +61,7 @@ export const batch: (args: BatchArgs) => Middleware =
       }
 
       function processBatch() {
-        if (!batch) {
-          return
-        }
-
+        assert(batch)
         const { timeout, messages, deferred } = batch
         batch = undefined
 
