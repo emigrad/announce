@@ -53,7 +53,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
       (connection) => {
         connection.on('error', (err) => {
           this.emit('error', err)
-          this.close(err.message ?? err)
+          this.close(err.message ?? String(err))
         })
       },
       (err) => this.emit('error', err)
@@ -145,7 +145,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
    * Rebuilds the channel with the given concurrency
    */
   private rebuildChannel(concurrency: number) {
-    if (this.rebuildPromises[concurrency]) {
+    if (this.rebuildPromises[concurrency] !== undefined) {
       return
     }
 

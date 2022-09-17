@@ -96,8 +96,8 @@ export class FileBackend extends LocalBackend {
   ): Promise<string[]> {
     try {
       return (await readdir(this.getQueuePath(subscriber.queueName))).sort()
-    } catch (e) {
-      if (e.code === 'ENOENT') {
+    } catch (e: unknown) {
+      if ((e as { code: string }).code === 'ENOENT') {
         return []
       } else {
         throw e
