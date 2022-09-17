@@ -189,7 +189,7 @@ describe('retry middleware', () => {
     let handleAttempts = 0
     let messagesPublished = 0
     announce.use(
-      spy({ onHandleError: ({ error }) => spyDfd.resolve(error) }),
+      spy({ onHandleError: () => spyDfd.resolve() }),
       retry({ maxRetries }),
       spy({
         onPublish: () => messagesPublished++
