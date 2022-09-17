@@ -1,5 +1,5 @@
 import { Announce } from '../Announce'
-import { Message } from './Message'
+import { Message, UnpublishedMessage } from './Message'
 import { Subscriber } from './Subscriber'
 
 export interface MiddlewareArgs {
@@ -37,6 +37,16 @@ export interface MiddlewareArgs {
    * subscribe()
    */
   addHandleMiddleware: (handleMiddleware: HandleMiddleware) => void
+
+  /**
+   * Publishes a message, bypassing any middleware that's added after this
+   * middleware
+   *
+   * @param messages The messages to publish
+   */
+  publish: <Body>(
+    ...messages: UnpublishedMessage<Body>[]
+  ) => Promise<Message<Body>[]>
 }
 
 export interface Middleware {

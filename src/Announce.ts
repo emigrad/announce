@@ -59,6 +59,8 @@ export class Announce extends EventEmitter {
    * handling a message, the innermost middleware is called first.
    */
   use(...middlewares: Middleware[]): this {
+    const publishMiddlewares = [...this.publishMiddlewares]
+
     middlewares.forEach((middlewareConstructor) => {
       let finished = false
 
@@ -92,6 +94,18 @@ export class Announce extends EventEmitter {
               "addSubscribeMiddleware() must be called from inside the middleware function, it can't be called after it has returned"
             )
           }
+        },
+        publish: <Body>(
+          ...messages: UnpublishedMessage<Body>[]
+        ): Promise<Message<Body>[]> => {
+          return Promise.all(
+            messages.map(async (message) => {
+              const completeMessage = getCompleteMessage(message)
+              await this._publish(completeMessage, publishMiddlewares)
+
+              return completeMessage
+            })
+          )
         }
       })
 
@@ -128,7 +142,7 @@ export class Announce extends EventEmitter {
     )
   }
 
-  async publish<Body = unknown>(
+  async publish<Body>(
     ...messages: UnpublishedMessage<Body>[]
   ): Promise<Message<Body>[]> {
     return Promise.all(

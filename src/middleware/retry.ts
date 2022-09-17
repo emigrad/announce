@@ -28,7 +28,7 @@ export const retry = ({
   maxRetries = 5,
   canRetry = () => true
 }: RetryArgs = {}): Middleware => {
-  return ({ announce, addSubscribeMiddleware }) => {
+  return ({ addSubscribeMiddleware, publish }) => {
     const initializedQueues: string[] = []
 
     addSubscribeMiddleware(async ({ subscriber, next }) => {
@@ -108,7 +108,7 @@ export const retry = ({
       // original handler.
       // We need to override the date so that withDelay() delays from now,
       // not from when the message was first published.
-      await announce.publish({
+      await publish({
         ...message,
         headers: {
           ...message.headers,
@@ -137,7 +137,7 @@ export const retry = ({
         queueName: name,
         topics: [name],
         handle(message) {
-          return announce.publish({
+          return publish({
             ...message,
             topic: message.headers[TOPIC_HEADER],
             properties: {

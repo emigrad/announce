@@ -181,6 +181,35 @@ describe('retry middleware', () => {
       expect(+message.properties.date).toBeGreaterThan(+messageDate)
     })
   })
+
+  it('Messages published to the delay queues should bypass middlewares that were added later', async () => {
+    const maxRetries = 2
+    const spyDfd = new Deferred<void>()
+    const announce = new Announce({ url: 'memory://' })
+    let handleAttempts = 0
+    let messagesPublished = 0
+    announce.use(
+      spy({ onHandleError: ({ error }) => spyDfd.resolve(error) }),
+      retry({ maxRetries }),
+      spy({
+        onPublish: () => messagesPublished++
+      })
+    )
+    await announce.subscribe({
+      queueName: 'test',
+      topics: ['test'],
+      handle() {
+        handleAttempts++
+        throw new Error('Oh no')
+      }
+    })
+
+    await announce.publish(createMessage('test', Buffer.from('')))
+    await spyDfd.promise
+
+    expect(handleAttempts).toBe(maxRetries + 1)
+    expect(messagesPublished).toBe(1)
+  })
 })
 
 function doNothing() {
