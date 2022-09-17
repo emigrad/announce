@@ -560,6 +560,19 @@ describe('RabbitMQ Backend', () => {
       )
     ).rejects.toBe(error)
   })
+
+  it('if the connection closes with an error, subsequent operations should fail with that error', async () => {
+    const error = new Error('Oh no')
+    const connection = await rabbitMq['connection']
+    connection.emit('error', error)
+
+    await Promise.resolve()
+    await expect(
+      rabbitMq.publish(
+        getCompleteMessage({ topic: 'hi', body: Buffer.from('') })
+      )
+    ).rejects.toContain(error.message)
+  })
 })
 
 function squelch() {

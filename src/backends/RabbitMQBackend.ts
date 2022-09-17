@@ -53,7 +53,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
       (connection) => {
         connection.on('error', (err) => {
           this.emit('error', err)
-          this.close()
+          this.close(err.message ?? err)
         })
       },
       (err) => this.emit('error', err)
@@ -99,12 +99,12 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     await this.consume(subscriber)
   }
 
-  async close(): Promise<void> {
+  async close(reason = 'Connection has been closed'): Promise<void> {
     if (!this.closePromise) {
       const connectionPromise = this.connection
 
       // Prevent any attempts to publish messages or add subscribers
-      this.connection = Promise.reject('Connection has been closed')
+      this.connection = Promise.reject(reason)
       // Avoid Node complaining about unhanded rejections
       this.connection.then(null, () => {
         // Squelch
