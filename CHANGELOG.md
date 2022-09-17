@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.1](https://github.com/emigrad/announce/compare/v0.6.0...v0.6.1) (2022-09-17)
+
+
+### Features
+
+* **RabbitMQ:** operations now reject with the message of the error if the connection closed ([1c99c78](https://github.com/emigrad/announce/commit/1c99c78318727235f0b5fb51cad37a7047b65b16))
+
+
+### Bug Fixes
+
+* retried messages should not pass through middleware added later ([909948c](https://github.com/emigrad/announce/commit/909948c85d37dd8d8d3cf3ae253b6d4b50411998))
+
 ## [0.6.0](https://github.com/emigrad/announce/compare/v0.5.1...v0.6.0) (2022-09-10)
 
 

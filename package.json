@@ -13,7 +13,7 @@
     "AMQP 0-9-1",
     "RabbitMQ"
   ],
-  "version": "0.6.0",
+  "version": "0.6.1",
   "files": [
     "dist"
   ],
