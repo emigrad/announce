@@ -1,3 +1,4 @@
+import assert from 'assert'
 import { createHash } from 'crypto'
 import { tmpdir } from 'os'
 import { resolve } from 'path'
@@ -5,7 +6,13 @@ import rimrafCb from 'rimraf'
 import { Deferred } from 'ts-deferred'
 import { promisify } from 'util'
 import { BackendSubscriber, Message } from '../types'
-import { createMessage, getCompleteMessage, getConcurrency } from '../util'
+import {
+  createMessage,
+  getCompleteMessage,
+  getConcurrency,
+  getDeadLetterQueueName,
+  getDeadLetterTopic
+} from '../util'
 import { FileBackend } from './FileBackend'
 
 const rimraf = promisify(rimrafCb)
@@ -60,18 +67,25 @@ describe('File backend', () => {
   ])(
     'Should support wildcards in topic selectors (selector: %p, topic: %p)',
     async (selector, topic, expected) => {
+      const delay = 200
+      const deferred = new Deferred<boolean>()
       let receivedMessage = false
       const subscriber: BackendSubscriber = {
         queueName: 'test',
         topics: [selector],
         handle: () => {
           receivedMessage = true
+          deferred.resolve(true)
+          clearTimeout(timeout)
         }
       }
       const message = createMessage(topic, Buffer.from('hi there'))
+      const timeout = setTimeout(() => deferred.resolve(false), delay)
 
       await fileBackend.subscribe(subscriber)
       await fileBackend.publish(getCompleteMessage(message))
+
+      await deferred.promise
 
       expect(receivedMessage).toBe(expected)
     }
@@ -94,7 +108,6 @@ describe('File backend', () => {
       queueName: 'test',
       topics: ['foo'],
       handle: async ({ body }) => {
-        expect(numRunning).toBeLessThan(getConcurrency(subscriber))
         numRunning++
         maxRunning = Math.max(maxRunning, numRunning)
 
@@ -114,35 +127,7 @@ describe('File backend', () => {
     )
     await done
 
-    expect(maxRunning).toBe(subscriber.options?.concurrency)
-  })
-
-  it('Should redeliver messages that did not complete processing', async () => {
-    const dfd = new Deferred()
-    const subscriber1: BackendSubscriber = {
-      queueName: 'test',
-      topics: ['foo.bar'],
-      handle: () =>
-        new Promise(() => {
-          // Never resolve
-        })
-    }
-    const subscriber2: BackendSubscriber = {
-      queueName: 'test',
-      topics: ['foo.bar'],
-      handle: () => dfd.resolve()
-    }
-    const message = createMessage('foo.bar', Buffer.from('hi there'))
-
-    const fileBackend1 = new FileBackend(path)
-    await fileBackend1.subscribe(subscriber1)
-    await fileBackend1.publish(getCompleteMessage(message))
-
-    const fileBackend2 = new FileBackend(path)
-    await fileBackend2.subscribe(subscriber2)
-
-    await dfd.promise
-    await Promise.all([fileBackend1.close(), fileBackend2.close()])
+    expect(maxRunning).toBe(getConcurrency(subscriber))
   })
 
   it('Should not redeliver messages that were successfully processed', async () => {
@@ -186,9 +171,12 @@ describe('File backend', () => {
           return Promise.reject()
         }
       }
+      const dlqName = getDeadLetterQueueName(subscriber)
+      const dlqTopic = getDeadLetterTopic(subscriber)
+      assert(dlqName && dlqTopic)
       const dlqSubscriber: BackendSubscriber = {
-        queueName: 'test.dlq',
-        topics: [],
+        queueName: dlqName,
+        topics: [dlqTopic],
         handle: () => dlqSubscriberDfd.resolve()
       }
       const message = getCompleteMessage({
@@ -212,4 +200,13 @@ describe('File backend', () => {
       await subscriberDfd.promise
     }
   )
+
+  it.todo('should support subscriber and publisher being on separate processes')
+  it.todo('should recover crashed messages')
+  it.todo('should not recover messages that are still being processed')
+  it.todo('should handle redefining queues')
+  it.todo('should handle queues being redefined by another process')
+  it.todo('should handle queues being removed')
+  it.todo('message processing stress test')
+  it.todo('should handle messages that were added before startup')
 })
