@@ -99,6 +99,8 @@ export class FileBackend extends EventEmitter {
       .on('change', (path) => this.onMessageTouched(path))
       .on('unlink', (path) => this.onMessageUnlinked(path))
 
+    await waitForReady(watcher)
+
     this.queuesByName[queueName] = {
       name: queueName,
       subscriber,
@@ -148,6 +150,7 @@ export class FileBackend extends EventEmitter {
       .on('change', (path) => this.onSubscriberChanged(path))
       .on('unlink', (path) => this.onSubscriberRemoved(path))
 
+    await waitForReady(this.subscriptionsWatcher)
     await this.loadExternalSubscribers()
 
     // TODO: restore crashed messages. We need to check that the file actually
@@ -409,6 +412,13 @@ function getTopicSelectorRegExp(topicSelector: string): RegExp {
 
 async function touch(path: string): Promise<void> {
   await close(await open(path, 'w'))
+}
+
+async function waitForReady(watcher: FSWatcher): Promise<void> {
+  return new Promise((resolve, reject) => {
+    watcher.on('ready', resolve)
+    watcher.on('error', reject)
+  })
 }
 
 type ExternalSubscriber = Pick<BackendSubscriber, 'queueName' | 'topics'>
