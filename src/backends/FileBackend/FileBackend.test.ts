@@ -1,34 +1,46 @@
 import assert from 'assert'
 import { createHash } from 'crypto'
+import { readdir as readdirCb, utimes as utimesCb } from 'fs'
 import { tmpdir } from 'os'
 import { resolve } from 'path'
 import rimrafCb from 'rimraf'
 import { Deferred } from 'ts-deferred'
 import { promisify } from 'util'
-import { BackendSubscriber, Message } from '../types'
+import { BackendSubscriber, Message } from '../../types'
 import {
   createMessage,
   getCompleteMessage,
   getConcurrency,
   getDeadLetterQueueName,
   getDeadLetterTopic
-} from '../util'
+} from '../../util'
 import { FileBackend } from './FileBackend'
+import clearAllTimers = jest.clearAllTimers
+import runAllTimers = jest.runAllTimers
+import chokidar from 'chokidar'
 
+const readdir = promisify(readdirCb)
 const rimraf = promisify(rimrafCb)
+const utimes = promisify(utimesCb)
+
+// chokidar uses nextTick() to fire the ready event
+jest.useFakeTimers({ doNotFake: ['nextTick'] })
 
 describe('File backend', () => {
   const hash = createHash('md5').update(__filename).digest('hex').toString()
   const path = resolve(tmpdir(), hash)
+  let handles: (() => unknown)[]
   let fileBackend: FileBackend
 
   beforeEach(async () => {
     await rimraf(path)
     fileBackend = new FileBackend(path)
+    handles = []
   })
 
   afterEach(async () => {
     await fileBackend.close()
+    await Promise.all(handles.map((handle) => handle()))
   })
 
   it('Should publish and receive messages', async () => {
@@ -201,12 +213,68 @@ describe('File backend', () => {
     }
   )
 
-  it.todo('should support subscriber and publisher being on separate processes')
-  it.todo('should recover crashed messages')
+  it('should recover crashed messages', async () => {
+    // Simulate a crashed process by creating a handler that never returns,
+    // then shutting down the keepalive timer that updates the modtime of
+    // the processing file
+    const handlingDfd = new Deferred()
+    const subscriber1: BackendSubscriber = {
+      queueName: 'test',
+      topics: ['foo.bar'],
+      handle: () =>
+        new Promise(() => {
+          handlingDfd.resolve()
+          // Never resolve
+        })
+    }
+    const message = getCompleteMessage({
+      topic: 'foo.bar',
+      body: Buffer.from('hi there')
+    })
+    const queuePath = fileBackend['getQueuePath'](subscriber1.queueName)
+
+    await fileBackend.subscribe(subscriber1)
+    await fileBackend.publish(message)
+
+    // Once this promise resolves, we know that the message is being handled
+    await handlingDfd.promise
+    const processingFile = (await readdir(queuePath))[0]
+
+    // Kill the backend's timers so it no longer touches the file
+    clearAllTimers()
+    // Make it look like the file hasn't been updated in a long time
+    await utimes(
+      resolve(queuePath, processingFile),
+      new Date('2020-01-01'),
+      new Date('2020-01-01')
+    )
+
+    // Create a new instance of the backend
+    const addedPathDfd = new Deferred()
+    const unlinkedPathDfd = new Deferred()
+    const fileBackend2 = new FileBackend(path)
+    handles.push(() => fileBackend2.close())
+    const watcher = chokidar
+      .watch(queuePath)
+      .on('add', (path) => addedPathDfd.resolve(path))
+      .on('unlink', (path) => unlinkedPathDfd.resolve(path))
+    handles.push(() => watcher.close())
+
+    // When we run the timers, it should see that the file is stale and make it available for
+    // processing
+    runAllTimers()
+
+    // It should have renamed the file back to its original name so that it can be reprocessed
+    expect(await unlinkedPathDfd.promise).toEqual(processingFile)
+    expect(await addedPathDfd.promise).toEqual(
+      processingFile.replace('.%processing.', '')
+    )
+  })
   it.todo('should not recover messages that are still being processed')
   it.todo('should handle redefining queues')
   it.todo('should handle queues being redefined by another process')
   it.todo('should handle queues being removed')
   it.todo('message processing stress test')
   it.todo('should handle messages that were added before startup')
+  it.todo('should handle multiple messages with the same ID')
 })
