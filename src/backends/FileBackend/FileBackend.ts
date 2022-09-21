@@ -238,7 +238,7 @@ export class FileBackend extends EventEmitter {
         debug(`Message ${message.properties.id} was rejected`)
       }
     } finally {
-      await unlink(messagePath)
+      await ignoreFileNotFoundErrors(unlink(messagePath))
       clearInterval(keepaliveTimer)
     }
   }
