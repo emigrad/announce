@@ -16,11 +16,7 @@ import rimrafCb from 'rimraf'
 import { clearInterval } from 'timers'
 import { promisify } from 'util'
 import { BackendSubscriber, Message } from '../../types'
-import {
-  getConcurrency,
-  getDeadLetterTopic,
-  hasDeadLetterTopic
-} from '../../util'
+import { getConcurrency } from '../../util'
 import {
   KEEPALIVE_INTERVAL,
   PROCESSING_DIRECTORY,
@@ -238,12 +234,8 @@ export class FileBackend extends EventEmitter {
       try {
         await subscriber.handle(message)
       } catch (e) {
-        if (hasDeadLetterTopic(subscriber)) {
-          const deadLetterTopic = getDeadLetterTopic(subscriber)
-          assert(deadLetterTopic)
-
-          // TODO: Publish to DLQ/DLT
-        }
+        // The deadLetterQueue polyfill provides dead letter support
+        debug(`Message ${message.properties.id} was rejected`)
       }
     } finally {
       await unlink(messagePath)

@@ -410,7 +410,6 @@ describe('File backend', () => {
 
   // it('should handle messages that were added before startup', async () => {})
   it('should handle multiple messages with the same ID', async () => {
-    console.log('START')
     const message = getCompleteMessage({
       topic: 'test',
       body: Buffer.from('hi there')
