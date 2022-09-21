@@ -11,6 +11,7 @@ import {
   READY_DIRECTORY,
   RESTORE_MESSAEGS_AFTER
 } from './constants'
+import { isFileNotFoundError } from './util'
 
 const debug = createDebug('announce:FileBackend:Watchdog')
 const rename = promisify(renameCb)
@@ -75,7 +76,7 @@ export class Watchdog extends EventEmitter {
       await rename(path, getReadyPath(path))
       debug(`Restored crashed message ${path}`)
     } catch (e: unknown) {
-      if ((e as { code?: string }).code === 'ENOENT') {
+      if (isFileNotFoundError(e)) {
         // If the file has already disappeared there's nothing else we need to do
       } else {
         throw e

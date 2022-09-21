@@ -1,5 +1,6 @@
 import assert from 'assert'
 import { createHash } from 'crypto'
+import { EventEmitter } from 'events'
 import { readdir as readdirCb, utimes as utimesCb } from 'fs'
 import { tmpdir } from 'os'
 import { resolve } from 'path'
@@ -31,13 +32,13 @@ describe('File backend', () => {
   let fileBackend: FileBackend
 
   beforeEach(async () => {
-    jest.useRealTimers()
     await rimraf(path)
     fileBackend = new FileBackend(path)
     handles = []
   })
 
   afterEach(async () => {
+    jest.useRealTimers()
     await fileBackend.close()
     await Promise.all(handles.map((handle) => handle()))
   })
@@ -212,72 +213,201 @@ describe('File backend', () => {
     }
   )
 
-  it('should recover crashed messages', async () => {
-    // chokidar uses nextTick() to fire the ready event
-    jest.useFakeTimers({ doNotFake: ['nextTick'] })
+  it.each([true, false])(
+    'should only recover crashed messages (crashed: %p)',
+    async (crashed) => {
+      // chokidar uses nextTick() to fire the ready event
+      jest.useFakeTimers({ doNotFake: ['nextTick'] })
 
-    // Simulate a crashed process by creating a handler that never returns,
-    // then shutting down the keepalive timer that updates the modtime of
-    // the processing file
-    const handlingDfd = new Deferred()
-    const subscriber1: BackendSubscriber = {
-      queueName: 'test',
-      topics: ['foo.bar'],
-      handle: () =>
-        new Promise(() => {
-          handlingDfd.resolve()
-          // Never resolve
-        })
-    }
-    const message = getCompleteMessage({
-      topic: 'foo.bar',
-      body: Buffer.from('hi there')
-    })
+      // Simulate a crashed process by creating a handler that never returns,
+      // then shutting down the keepalive timer that updates the modtime of
+      // the processing file
+      const handlingDfd = new Deferred()
+      const subscriber1: BackendSubscriber = {
+        queueName: 'test',
+        topics: ['foo.bar'],
+        handle: () =>
+          new Promise(() => {
+            handlingDfd.resolve()
+            // Never resolve
+          })
+      }
+      const message = getCompleteMessage({
+        topic: 'foo.bar',
+        body: Buffer.from('hi there')
+      })
 
-    await fileBackend.subscribe(subscriber1)
-    await fileBackend.publish(message)
+      await fileBackend.subscribe(subscriber1)
+      await fileBackend.publish(message)
 
-    // Once this promise resolves, we know that the message is being handled
-    await handlingDfd.promise
-    const queuePath = resolve(
-      getQueuePath(resolve(path, QUEUES_DIRECTORY), subscriber1.queueName),
-      PROCESSING_DIRECTORY
-    )
-    const processingFile = (await readdir(queuePath))[0]
+      // Once this promise resolves, we know that the message is being handled
+      await handlingDfd.promise
+      const queuePath = resolve(
+        getQueuePath(resolve(path, QUEUES_DIRECTORY), subscriber1.queueName),
+        PROCESSING_DIRECTORY
+      )
+      const processingFile = (await readdir(queuePath))[0]
 
-    // Kill the backend's timers so it no longer touches the file
-    clearAllTimers()
+      // Kill the backend's timers so it no longer touches the file
+      clearAllTimers()
 
-    // Make it look like the file hasn't been updated in a long time
-    await utimes(
-      resolve(queuePath, processingFile),
-      new Date('2020-01-01'),
-      new Date('2020-01-01')
-    )
+      if (crashed) {
+        // Make it look like the file hasn't been updated in a long time
+        await utimes(
+          resolve(queuePath, processingFile),
+          new Date('2020-01-01'),
+          new Date('2020-01-01')
+        )
+      }
 
-    // Now prepare a new instance with a subscriber on that queue
-    const messageDfd = new Deferred()
-    const subscriber2: BackendSubscriber = {
-      ...subscriber1,
-      handle(message) {
-        messageDfd.resolve(message)
+      // Now prepare a new instance with a subscriber on that queue
+      const messageDfd = new Deferred()
+      const subscriber2: BackendSubscriber = {
+        ...subscriber1,
+        handle(message) {
+          messageDfd.resolve(message)
+        }
+      }
+      const fileBackend2 = new FileBackend(path)
+      await fileBackend2.subscribe(subscriber2)
+      handles.push(() => fileBackend2.close())
+
+      // When we run the timers, it should see that the file is stale,
+      // make it available for processing, then process it
+      runOnlyPendingTimers()
+
+      if (crashed) {
+        expect(await messageDfd.promise).toMatchObject(message)
+      } else {
+        expect(await readdir(queuePath)).toEqual([processingFile])
       }
     }
+  )
+
+  it('should handle redefining queues', async () => {
+    const emitter = new EventEmitter()
+    const handle = ({ topic }: Message) => {
+      emitter.emit(topic)
+    }
+    const testSubscription1: BackendSubscriber = {
+      queueName: 'test',
+      topics: ['test1'],
+      handle
+    }
+    const testSubscription2: BackendSubscriber = {
+      queueName: 'test',
+      topics: ['test2'],
+      handle
+    }
+    const interval = setInterval(async () => {
+      await fileBackend.publish(
+        getCompleteMessage({
+          topic: 'test1',
+          body: Buffer.from('hi there')
+        })
+      )
+      await fileBackend.publish(
+        getCompleteMessage({
+          topic: 'test2',
+          body: Buffer.from('hi there')
+        })
+      )
+    }, 50)
+    await fileBackend.subscribe(testSubscription1)
     const fileBackend2 = new FileBackend(path)
-    await fileBackend2.subscribe(subscriber2)
+    handles.push(
+      () => fileBackend2.close(),
+      () => clearInterval(interval)
+    )
 
-    // When we run the timers, it should see that the file is stale,
-    // make it available for processing, then process it
-    runOnlyPendingTimers()
+    // Wait until we see a message come through
+    await new Promise((resolve) => emitter.once('test1', resolve))
 
-    expect(await messageDfd.promise).toMatchObject(message)
+    // This should stop (after a while) the messages from topic 1
+    await fileBackend2.subscribe(testSubscription2)
+
+    // Wait until we see a message come through
+    await new Promise((resolve) => emitter.once('test2', resolve))
+
+    const messagesSeen: Record<string, number> = { test1: 0, test2: 0 }
+    emitter.on('test1', () => messagesSeen.test1++)
+    emitter.on('test2', () => messagesSeen.test2++)
+
+    // Wait until we've seen a few messages into test2
+    await new Promise<void>((resolve) =>
+      emitter.on('test2', () => {
+        if (messagesSeen.test2 >= 3) {
+          resolve()
+        }
+      })
+    )
+
+    // Depending on exactly when the first FileBackend gets notified that the
+    // subscription has changed, there may still be a message dispatched
+    // to test1, but there should not be more than one message
+    expect(messagesSeen.test1).not.toBeGreaterThan(1)
   })
 
-  it.todo('should not recover messages that are still being processed')
-  it.todo('should handle redefining queues')
-  it.todo('should handle queues being redefined by another process')
-  it.todo('should handle queues being removed')
-  it.todo('message processing stress test')
-  it.todo('should handle messages that were added before startup')
+  it('should handle queues being deleted', async () => {
+    const emitter = new EventEmitter()
+    const subscriber: BackendSubscriber = {
+      topics: ['foo.bar'],
+      queueName: 'test',
+      handle: () => {
+        emitter.emit('message')
+      },
+      options: { concurrency: 3 }
+    }
+    const message = getCompleteMessage({
+      topic: subscriber.topics[0],
+      body: Buffer.from('hello')
+    })
+    const fileBackend2 = new FileBackend(path)
+    await fileBackend.subscribe(subscriber)
+    await fileBackend2.subscribe(subscriber)
+    const errors: unknown[] = []
+    // Spam both backends with messages
+    const messageSendInterval = setInterval(async () => {
+      await Promise.all([
+        fileBackend.publish(message),
+        fileBackend2.publish(message)
+      ])
+    }, 0)
+    let messageCount = 0
+    let mostRecentMessageTime = Infinity
+    emitter.on('message', () => (mostRecentMessageTime = Date.now()))
+    handles.push(() => clearInterval(messageSendInterval))
+    fileBackend.on('error', (error) => errors.push(error))
+    fileBackend2.on('error', (error) => errors.push(error))
+
+    // Wait for a few messages to start coming through
+    await new Promise<void>((resolve) => {
+      emitter.on('message', handler)
+
+      function handler() {
+        if (++messageCount > 10) {
+          emitter.removeListener('message', handler)
+          resolve()
+        }
+      }
+    })
+
+    // Delete the queue
+    await fileBackend.deleteQueue(subscriber.queueName)
+
+    // And wait for the messages to stop
+    await new Promise<void>((resolve) => {
+      const silenceTimer = setInterval(() => {
+        if (mostRecentMessageTime < Date.now() - 300) {
+          clearInterval(silenceTimer)
+          resolve()
+        }
+      })
+    })
+    expect(errors).toHaveLength(0)
+  })
+
+  // it('should handle messages that were added before startup', async () => {})
   it.todo('should handle multiple messages with the same ID')
+  it.todo('message processing stress test')
 })

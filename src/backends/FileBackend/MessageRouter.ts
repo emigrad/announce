@@ -15,6 +15,7 @@ import {
   atomicWriteFile,
   getQueueNameFromSubscriberPath,
   getQueuePath,
+  isFileNotFoundError,
   serializeMessage,
   waitForReady
 } from './util'
@@ -78,7 +79,17 @@ export class MessageRouter {
     const path = this.getMessagePath(message, queue)
     const contents = serializeMessage(message)
 
-    await atomicWriteFile(path, contents)
+    try {
+      await atomicWriteFile(path, contents)
+    } catch (e: unknown) {
+      if (isFileNotFoundError(e)) {
+        // Likely the queue path has been deleted, which means something's
+        // in the process of removing this subscription
+      } else {
+        throw e
+      }
+    }
+
     debug(`Wrote message ${message.properties.id} to ${path}`)
   }
 
@@ -102,7 +113,7 @@ export class MessageRouter {
     await this.createQueuePaths(externalSubscriber.queueName)
     this.externalSubscribers[externalSubscriber.queueName] = externalSubscriber
 
-    debug(`Subscriber added or changed: ${path}`)
+    debug(`Subscriber changed: ${path}`)
   }
 
   private async onSubscriberRemoved(path: string): Promise<void> {

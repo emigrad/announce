@@ -37,6 +37,13 @@ export function getQueuePath(queuesPath: string, queueName: string): string {
   return join(queuesPath, encodeURIComponent(queueName))
 }
 
+export function getSubscriptionPath(
+  subscriptionsPath: string,
+  queueName: string
+): string {
+  return join(subscriptionsPath, `${encodeURIComponent(queueName)}.json`)
+}
+
 export function serializeMessage(message: Message<Buffer>): Buffer {
   const contents = JSON.stringify({
     ...message,
@@ -51,4 +58,8 @@ export function deserializeMessage(buffer: Buffer): Message<Buffer> {
   parsedMessage.properties.date = new Date(parsedMessage.properties.date)
 
   return { ...parsedMessage, body: Buffer.from(parsedMessage.body, 'base64') }
+}
+
+export function isFileNotFoundError(e: unknown) {
+  return (e as { code?: string })?.code === 'ENOENT'
 }

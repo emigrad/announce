@@ -1,4 +1,5 @@
 import assert from 'assert'
+import rimrafCb from 'rimraf'
 import chokidar, { FSWatcher } from 'chokidar'
 import createDebug from 'debug'
 import { EventEmitter } from 'events'
@@ -33,6 +34,8 @@ import {
   deserializeMessage,
   getQueueNameFromMessagePath,
   getQueuePath,
+  getSubscriptionPath,
+  isFileNotFoundError,
   waitForReady
 } from './util'
 import { Watchdog } from './Watchdog'
@@ -42,6 +45,7 @@ const close = promisify(closeCb)
 const open = promisify(openCb)
 const readFile = promisify(readFileCb)
 const rename = promisify(renameCb)
+const rimraf = promisify(rimrafCb)
 const unlink = promisify(unlinkCb)
 
 /**
@@ -126,6 +130,18 @@ export class FileBackend extends EventEmitter {
     debug(`Published message ${message.properties.id}`)
   }
 
+  async deleteQueue(queueName: string): Promise<void> {
+    const queue = this.queuesByName[queueName]
+
+    if (queue) {
+      await queue.watcher.close()
+      delete this.queuesByName[queueName]
+    }
+
+    await unlink(getSubscriptionPath(this.subscriptionsPath, queueName))
+    await rimraf(getQueuePath(this.queuesPath, queueName))
+  }
+
   async close(): Promise<void> {
     await this.ready
     await this.watchdog.close()
@@ -142,9 +158,9 @@ export class FileBackend extends EventEmitter {
   }
 
   private async writeSubscriber(subscriber: BackendSubscriber): Promise<void> {
-    const subscriberPath = join(
+    const subscriberPath = getSubscriptionPath(
       this.subscriptionsPath,
-      `${encodeURIComponent(subscriber.queueName)}.json`
+      subscriber.queueName
     )
 
     await atomicWriteFile(subscriberPath, serializeSubscriber(subscriber))
@@ -183,7 +199,7 @@ export class FileBackend extends EventEmitter {
           // Attempt to "lock" the file
           await rename(messagePath, processingPath)
         } catch (e: unknown) {
-          if ((e as { code?: string })?.code === 'ENOENT') {
+          if (isFileNotFoundError(e)) {
             // Some other process has already locked this message
             return
           } else {
