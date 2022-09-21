@@ -11,7 +11,7 @@ import {
 } from 'fs'
 import { join, resolve, sep } from 'path'
 import PromiseQueue from 'promise-queue'
-import { prop } from 'rambda'
+import { prop, uniq } from 'rambda'
 import rimrafCb from 'rimraf'
 import { clearInterval } from 'timers'
 import { promisify } from 'util'
@@ -25,6 +25,7 @@ import {
   SUBSCRIPTIONS_DIRECTORY
 } from './constants'
 import { MessageRouter } from './MessageRouter'
+import { ExternalSubscriber } from './types'
 import {
   atomicWriteFile,
   deserializeMessage,
@@ -95,7 +96,7 @@ export class FileBackend extends EventEmitter {
     const queuePath = getQueuePath(this.queuesPath, queueName)
 
     await this.ready
-    await this.writeSubscriber(subscriber)
+    await this.bindQueue(queueName, subscriber.topics)
     await this.watchdog.watch(queuePath)
 
     const existingQueue = this.queuesByName[queueName]
@@ -117,8 +118,12 @@ export class FileBackend extends EventEmitter {
       processingQueue: new PromiseQueue(getConcurrency(subscriber))
     }
 
+    debug(
+      `Registered subscriber ${JSON.stringify(
+        subscriber
+      )}, watching for messages in ${messagesGlob}`
+    )
     await waitForReady(watcher)
-    debug(`Watching for messages in ${messagesGlob}`)
   }
 
   async publish(message: Message<Buffer>): Promise<void> {
@@ -154,20 +159,69 @@ export class FileBackend extends EventEmitter {
     debug('Closed')
   }
 
+  /**
+   * Binds the queue to the given topics, in addition to any topics it's
+   * already listening on
+   */
+  async bindQueue(queueName: string, topics: readonly string[]): Promise<void> {
+    await this.updateTopics(queueName, topics, [])
+  }
+
+  async unbindQueue(
+    queueName: string,
+    topics: readonly string[]
+  ): Promise<void> {
+    await this.updateTopics(queueName, [], topics)
+  }
+
   private async initialize(): Promise<void> {
     await this.messageRouter.ready
   }
 
-  private async writeSubscriber(subscriber: BackendSubscriber): Promise<void> {
+  private async loadExternalSubscriber(
+    queueName: string
+  ): Promise<ExternalSubscriber> {
     const subscriberPath = getSubscriptionPath(
       this.subscriptionsPath,
-      subscriber.queueName
+      queueName
     )
+    const existingContents = await ignoreFileNotFoundErrors(
+      readFile(subscriberPath)
+    )
+    return existingContents
+      ? JSON.parse(existingContents.toString())
+      : { queueName, topics: [] }
+  }
 
-    await atomicWriteFile(subscriberPath, serializeSubscriber(subscriber))
-    await this.messageRouter.subscriberChanged(subscriberPath)
+  private async updateTopics(
+    queueName: string,
+    topicsToAdd: readonly string[],
+    topicsToRemove: readonly string[]
+  ): Promise<void> {
+    const subscriber = await this.loadExternalSubscriber(queueName)
+    const existingTopics = subscriber.topics
+    const updatedTopics = uniq(
+      [...existingTopics, ...topicsToAdd].filter(
+        (topic) => !topicsToRemove.includes(topic)
+      )
+    ).sort()
 
-    debug(`Registered subscriber ${JSON.stringify(subscriber)}`)
+    if (JSON.stringify(existingTopics) !== JSON.stringify(updatedTopics)) {
+      const subscriberPath = getSubscriptionPath(
+        this.subscriptionsPath,
+        queueName
+      )
+      subscriber.topics = updatedTopics
+
+      await atomicWriteFile(subscriberPath, JSON.stringify(subscriber))
+      await this.messageRouter.subscriberChanged(subscriberPath)
+
+      debug(
+        `Updated topic bindings for queue ${queueName} from ${JSON.stringify(
+          existingTopics
+        )} to ${JSON.stringify(updatedTopics)}`
+      )
+    }
   }
 
   private async onMessageAdded(path: string): Promise<void> {
@@ -267,10 +321,6 @@ export class FileBackend extends EventEmitter {
     }
     debug(`Message removed: ${path}`)
   }
-}
-
-function serializeSubscriber({ queueName, topics }: BackendSubscriber): string {
-  return JSON.stringify({ queueName, topics })
 }
 
 async function touch(path: string): Promise<void> {

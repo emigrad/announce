@@ -4,13 +4,14 @@ import { mkdir as mkdirCb, readFile as readFileCb } from 'fs'
 import { join, resolve } from 'path'
 import { prop } from 'rambda'
 import { promisify } from 'util'
-import { BackendSubscriber, Message } from '../../types'
+import { Message } from '../../types'
 import {
   PROCESSING_DIRECTORY,
   QUEUES_DIRECTORY,
   READY_DIRECTORY,
   SUBSCRIPTIONS_DIRECTORY
 } from './constants'
+import { ExternalSubscriber } from './types'
 import {
   atomicWriteFile,
   getQueueNameFromSubscriberPath,
@@ -30,6 +31,7 @@ export class MessageRouter {
   private readonly subscriptionsPath: string
   private subscriptionsWatcher!: FSWatcher
   private readonly externalSubscribers: Record<string, ExternalSubscriber> = {}
+  private readonly timers: NodeJS.Timer[] = []
 
   constructor(basePath: string) {
     this.queuesPath = resolve(basePath, QUEUES_DIRECTORY)
@@ -61,6 +63,7 @@ export class MessageRouter {
 
   async close(): Promise<void> {
     await this.subscriptionsWatcher.close()
+    this.timers.forEach((timer) => clearTimeout(timer))
   }
 
   private async initialize(): Promise<void> {
@@ -121,15 +124,36 @@ export class MessageRouter {
   }
 
   private async onSubscriberChanged(path: string): Promise<void> {
-    const fileContents = await readFile(path)
+    const fileContents = await ignoreFileNotFoundErrors(readFile(path))
+
+    if (!fileContents) {
+      // It's possible the file no longer exists
+      return
+    }
+
     const externalSubscriber: ExternalSubscriber = JSON.parse(
       fileContents.toString()
     )
 
-    await this.createQueuePaths(externalSubscriber.queueName)
-    this.externalSubscribers[externalSubscriber.queueName] = externalSubscriber
+    if (
+      JSON.stringify(externalSubscriber) !==
+      JSON.stringify(this.externalSubscribers[externalSubscriber.queueName])
+    ) {
+      await this.createQueuePaths(externalSubscriber.queueName)
+      this.externalSubscribers[externalSubscriber.queueName] =
+        externalSubscriber
 
-    debug(`Subscriber changed: ${path}`)
+      debug(`Subscriber changed: ${path}`)
+    }
+
+    // If the file changes several times in rapid succession, we may
+    // not receive notifications for the subsequent updates, so check
+    // back in a second to ensure our in-memory copy isn't stale
+    const timer = setTimeout(() => {
+      this.timers.splice(this.timers.indexOf(timer), 1)
+      this.onSubscriberChanged(path)
+    }, 1000)
+    this.timers.push(timer)
   }
 
   private async onSubscriberRemoved(path: string): Promise<void> {
@@ -178,5 +202,3 @@ function getTopicSelectorRegExp(topicSelector: string): RegExp {
 function randomString(): string {
   return String(Math.random()).substring(2)
 }
-
-type ExternalSubscriber = Pick<BackendSubscriber, 'queueName' | 'topics'>

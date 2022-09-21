@@ -60,13 +60,15 @@ export function deserializeMessage(buffer: Buffer): Message<Buffer> {
   return { ...parsedMessage, body: Buffer.from(parsedMessage.body, 'base64') }
 }
 
-export async function ignoreFileNotFoundErrors(
-  promise: PromiseLike<unknown>
-): Promise<void> {
+export async function ignoreFileNotFoundErrors<T>(
+  promise: PromiseLike<T>
+): Promise<T | undefined> {
   try {
-    await promise
+    return await promise
   } catch (e: unknown) {
-    if (!isFileNotFoundError(e)) {
+    if (isFileNotFoundError(e)) {
+      return undefined
+    } else {
       throw e
     }
   }

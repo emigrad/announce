@@ -160,15 +160,16 @@ describe('File backend', () => {
     })
 
     const fileBackend1 = new FileBackend(path)
+    handles.push(() => fileBackend1.close())
     await fileBackend1.subscribe(subscriber)
     await fileBackend1.publish(message)
     await dfd.promise
 
     const fileBackend2 = new FileBackend(path)
+    handles.push(() => fileBackend2.close())
     await fileBackend2.subscribe(subscriber)
 
     expect(handleCount).toBe(1)
-    await Promise.all([fileBackend1.close(), fileBackend2.close()])
   })
 
   it.each([false, true])(
@@ -270,8 +271,8 @@ describe('File backend', () => {
         }
       }
       const fileBackend2 = new FileBackend(path)
-      await fileBackend2.subscribe(subscriber2)
       handles.push(() => fileBackend2.close())
+      await fileBackend2.subscribe(subscriber2)
 
       // When we run the timers, it should see that the file is stale,
       // make it available for processing, then process it
@@ -285,32 +286,28 @@ describe('File backend', () => {
     }
   )
 
-  it('should handle redefining queues', async () => {
+  it('should handle rebinding queues', async () => {
     const emitter = new EventEmitter()
-    const handle = ({ topic }: Message) => {
-      emitter.emit(topic)
-    }
     const testSubscription1: BackendSubscriber = {
       queueName: 'test',
       topics: ['test1'],
-      handle
-    }
-    const testSubscription2: BackendSubscriber = {
-      queueName: 'test',
-      topics: ['test2'],
-      handle
+      handle({ topic }: Message) {
+        emitter.emit(topic)
+      }
     }
     const interval = setInterval(async () => {
       await fileBackend.publish(
         getCompleteMessage({
           topic: 'test1',
-          body: Buffer.from('hi there')
+          body: Buffer.from('hi there'),
+          properties: { id: `${Date.now()}-test1` }
         })
       )
       await fileBackend.publish(
         getCompleteMessage({
           topic: 'test2',
-          body: Buffer.from('hi there')
+          body: Buffer.from('hi there'),
+          properties: { id: `${Date.now()}-test2` }
         })
       )
     }, 50)
@@ -325,7 +322,8 @@ describe('File backend', () => {
     await new Promise((resolve) => emitter.once('test1', resolve))
 
     // This should stop (after a while) the messages from topic 1
-    await fileBackend2.subscribe(testSubscription2)
+    await fileBackend2.unbindQueue('test', ['test1'])
+    await fileBackend2.bindQueue('test', ['test2'])
 
     // Wait until we see a message come through
     await new Promise((resolve) => emitter.once('test2', resolve))
@@ -364,6 +362,7 @@ describe('File backend', () => {
       body: Buffer.from('hello')
     })
     const fileBackend2 = new FileBackend(path)
+    handles.push(() => fileBackend2.close())
     await fileBackend.subscribe(subscriber)
     await fileBackend2.subscribe(subscriber)
     const errors: unknown[] = []

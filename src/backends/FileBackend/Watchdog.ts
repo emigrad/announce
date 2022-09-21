@@ -30,7 +30,7 @@ export class Watchdog extends EventEmitter {
       } catch (e) {
         this.emit('error', e)
       }
-    }, KEEPALIVE_INTERVAL)
+    }, KEEPALIVE_INTERVAL).unref()
   }
 
   async watch(path: string): Promise<void> {
