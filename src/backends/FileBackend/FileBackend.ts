@@ -1,5 +1,4 @@
 import assert from 'assert'
-import rimrafCb from 'rimraf'
 import chokidar, { FSWatcher } from 'chokidar'
 import createDebug from 'debug'
 import { EventEmitter } from 'events'
@@ -10,9 +9,10 @@ import {
   rename as renameCb,
   unlink as unlinkCb
 } from 'fs'
-import { basename, dirname, join, resolve, sep } from 'path'
+import { join, resolve, sep } from 'path'
 import PromiseQueue from 'promise-queue'
 import { prop } from 'rambda'
+import rimrafCb from 'rimraf'
 import { clearInterval } from 'timers'
 import { promisify } from 'util'
 import { BackendSubscriber, Message } from '../../types'
@@ -35,6 +35,7 @@ import {
   getQueueNameFromMessagePath,
   getQueuePath,
   getSubscriptionPath,
+  ignoreFileNotFoundErrors,
   isFileNotFoundError,
   waitForReady
 } from './util'
@@ -62,9 +63,9 @@ const unlink = promisify(unlinkCb)
  *  - dead letter queues
  */
 export class FileBackend extends EventEmitter {
+  public readonly ready: Promise<void>
   private readonly queuesPath: string
   private readonly subscriptionsPath: string
-  private readonly ready: Promise<void>
   private readonly queuesByName: Record<string, Queue> = {}
   private readonly messageRouter: MessageRouter
   private readonly watchdog: Watchdog
@@ -81,7 +82,7 @@ export class FileBackend extends EventEmitter {
     this.watchdog = new Watchdog()
     this.messageRouter = new MessageRouter(basePath)
 
-    this.ready = this.startup()
+    this.ready = this.initialize()
     this.ready.then(
       () => {
         debug(`Backend ready: ${basePath}`)
@@ -112,7 +113,6 @@ export class FileBackend extends EventEmitter {
       .on('add', (path) => this.onMessageAdded(path))
       .on('unlink', (path) => this.onMessageUnlinked(path))
 
-    await waitForReady(watcher)
     this.queuesByName[queueName] = {
       name: queueName,
       subscriber,
@@ -121,6 +121,7 @@ export class FileBackend extends EventEmitter {
       processingQueue: new PromiseQueue(getConcurrency(subscriber))
     }
 
+    await waitForReady(watcher)
     debug(`Watching for messages in ${messagesGlob}`)
   }
 
@@ -138,8 +139,12 @@ export class FileBackend extends EventEmitter {
       delete this.queuesByName[queueName]
     }
 
-    await unlink(getSubscriptionPath(this.subscriptionsPath, queueName))
-    await rimraf(getQueuePath(this.queuesPath, queueName))
+    await ignoreFileNotFoundErrors(
+      unlink(getSubscriptionPath(this.subscriptionsPath, queueName))
+    )
+    await ignoreFileNotFoundErrors(
+      rimraf(getQueuePath(this.queuesPath, queueName))
+    )
   }
 
   async close(): Promise<void> {
@@ -153,7 +158,7 @@ export class FileBackend extends EventEmitter {
     debug('Closed')
   }
 
-  private async startup(): Promise<void> {
+  private async initialize(): Promise<void> {
     await this.messageRouter.ready
   }
 
@@ -171,10 +176,13 @@ export class FileBackend extends EventEmitter {
 
   private async onMessageAdded(path: string): Promise<void> {
     const queueName = getQueueNameFromMessagePath(path)
+    const queue = this.queuesByName[queueName]
 
-    debug(`Message added: ${path}`)
-    this.queuesByName[queueName].pendingMessages.push(path)
-    await this.processNextMessage(queueName)
+    if (queue) {
+      debug(`Message queued: ${path}`)
+      queue.pendingMessages.push(path)
+      await this.processNextMessage(queueName)
+    }
   }
 
   private async processNextMessage(queueName: string): Promise<void> {
@@ -251,7 +259,7 @@ export class FileBackend extends EventEmitter {
   }
 
   private async onMessageUnlinked(path: string): Promise<void> {
-    const queueName = basename(dirname(path))
+    const queueName = getQueueNameFromMessagePath(path)
     const queue = this.queuesByName[queueName]
 
     if (!queue) {

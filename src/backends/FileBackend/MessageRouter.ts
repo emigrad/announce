@@ -1,7 +1,7 @@
 import chokidar, { FSWatcher } from 'chokidar'
 import createDebug from 'debug'
-import { join, resolve } from 'path'
 import { mkdir as mkdirCb, readFile as readFileCb } from 'fs'
+import { join, resolve } from 'path'
 import { prop } from 'rambda'
 import { promisify } from 'util'
 import { BackendSubscriber, Message } from '../../types'
@@ -15,7 +15,7 @@ import {
   atomicWriteFile,
   getQueueNameFromSubscriberPath,
   getQueuePath,
-  isFileNotFoundError,
+  ignoreFileNotFoundErrors,
   serializeMessage,
   waitForReady
 } from './util'
@@ -48,6 +48,12 @@ export class MessageRouter {
       .filter(subscribesTo(message.topic))
       .map(prop('queueName'))
 
+    debug(
+      `Delivering message ${message.properties.id} to queues ${JSON.stringify(
+        queueNames
+      )}`
+    )
+
     await Promise.all(
       queueNames.map((queueName) => this.addToQueue(message, queueName))
     )
@@ -60,13 +66,30 @@ export class MessageRouter {
   private async initialize(): Promise<void> {
     await mkdir(this.subscriptionsPath, { recursive: true })
 
+    let startingUp = true
+    const startupPromises: Promise<void>[] = []
+
     this.subscriptionsWatcher = chokidar
       .watch(join(this.subscriptionsPath, '*.json'))
-      .on('add', (path) => this.onSubscriberChanged(path))
+      .on('add', (path) => {
+        const promise = this.onSubscriberChanged(path)
+
+        if (startingUp) {
+          // Don't record the promise once we've started up because that
+          // would cause a memory leak
+          startupPromises.push(promise)
+        }
+      })
       .on('change', (path) => this.onSubscriberChanged(path))
       .on('unlink', (path) => this.onSubscriberRemoved(path))
 
     await waitForReady(this.subscriptionsWatcher)
+
+    // We receive the ready event as soon as chokidar has informed us of
+    // all the subscription files, however we still need time to process them
+    // If we mark ourselves as ready before we've done so, we may lose messages
+    startingUp = false
+    await Promise.all(startupPromises)
   }
 
   /**
@@ -79,16 +102,9 @@ export class MessageRouter {
     const path = this.getMessagePath(message, queue)
     const contents = serializeMessage(message)
 
-    try {
-      await atomicWriteFile(path, contents)
-    } catch (e: unknown) {
-      if (isFileNotFoundError(e)) {
-        // Likely the queue path has been deleted, which means something's
-        // in the process of removing this subscription
-      } else {
-        throw e
-      }
-    }
+    // A file not found error means the queue has been deleted, so we no
+    // longer need to store a message there
+    await ignoreFileNotFoundErrors(atomicWriteFile(path, contents))
 
     debug(`Wrote message ${message.properties.id} to ${path}`)
   }

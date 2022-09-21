@@ -34,6 +34,7 @@ describe('File backend', () => {
   beforeEach(async () => {
     await rimraf(path)
     fileBackend = new FileBackend(path)
+    await fileBackend.ready
     handles = []
   })
 
@@ -408,6 +409,43 @@ describe('File backend', () => {
   })
 
   // it('should handle messages that were added before startup', async () => {})
-  it.todo('should handle multiple messages with the same ID')
+  it('should handle multiple messages with the same ID', async () => {
+    console.log('START')
+    const message = getCompleteMessage({
+      topic: 'test',
+      body: Buffer.from('hi there')
+    })
+    const receivedMessages: Message<Buffer>[] = []
+    const receivedMessagesDeferred = new Deferred()
+    const subscriber: BackendSubscriber = {
+      queueName: 'test',
+      topics: ['test'],
+      handle: (receivedMessage) => {
+        receivedMessages.push(receivedMessage)
+
+        if (receivedMessages.length === 2) {
+          receivedMessagesDeferred.resolve(receivedMessages)
+        }
+      }
+    }
+    const fileBackend2 = new FileBackend(path)
+    await fileBackend2.subscribe(subscriber)
+    await fileBackend2.close()
+
+    // Have to use a new instance because we can't guarantee when fileBackend
+    // will receive notification that there's a new subscription
+    const fileBackend3 = new FileBackend(path)
+    handles.push(() => fileBackend3.close())
+    await fileBackend3.ready
+    await fileBackend3.publish(message)
+    await fileBackend3.publish(message)
+    await fileBackend3.subscribe(subscriber)
+
+    expect(await receivedMessagesDeferred.promise).toMatchObject([
+      message,
+      message
+    ])
+  })
+
   it.todo('message processing stress test')
 })
