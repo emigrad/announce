@@ -1,4 +1,5 @@
 import chokidar, { FSWatcher } from 'chokidar'
+import createDebug from 'debug'
 import { join, resolve } from 'path'
 import { mkdir as mkdirCb, readFile as readFileCb } from 'fs'
 import { prop } from 'rambda'
@@ -17,8 +18,8 @@ import {
   serializeMessage,
   waitForReady
 } from './util'
-import { debug } from './util'
 
+const debug = createDebug('announce:FileBackend:MessageRouter')
 const mkdir = promisify(mkdirCb)
 const readFile = promisify(readFileCb)
 
@@ -60,7 +61,6 @@ export class MessageRouter {
 
     this.subscriptionsWatcher = chokidar
       .watch(join(this.subscriptionsPath, '*.json'))
-      .on('addDir', (path) => console.log('adddir', path))
       .on('add', (path) => this.onSubscriberChanged(path))
       .on('change', (path) => this.onSubscriberChanged(path))
       .on('unlink', (path) => this.onSubscriberRemoved(path))

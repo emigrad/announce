@@ -14,17 +14,15 @@ import {
   getDeadLetterQueueName,
   getDeadLetterTopic
 } from '../../util'
+import { PROCESSING_DIRECTORY, QUEUES_DIRECTORY } from './constants'
 import { FileBackend } from './FileBackend'
+import { getQueuePath } from './util'
 import clearAllTimers = jest.clearAllTimers
-import runAllTimers = jest.runAllTimers
-import chokidar from 'chokidar'
+import runOnlyPendingTimers = jest.runOnlyPendingTimers
 
 const readdir = promisify(readdirCb)
 const rimraf = promisify(rimrafCb)
 const utimes = promisify(utimesCb)
-
-// chokidar uses nextTick() to fire the ready event
-jest.useFakeTimers({ doNotFake: ['nextTick'] })
 
 describe('File backend', () => {
   const hash = createHash('md5').update(__filename).digest('hex').toString()
@@ -33,6 +31,7 @@ describe('File backend', () => {
   let fileBackend: FileBackend
 
   beforeEach(async () => {
+    jest.useRealTimers()
     await rimraf(path)
     fileBackend = new FileBackend(path)
     handles = []
@@ -214,6 +213,9 @@ describe('File backend', () => {
   )
 
   it('should recover crashed messages', async () => {
+    // chokidar uses nextTick() to fire the ready event
+    jest.useFakeTimers({ doNotFake: ['nextTick'] })
+
     // Simulate a crashed process by creating a handler that never returns,
     // then shutting down the keepalive timer that updates the modtime of
     // the processing file
@@ -231,17 +233,21 @@ describe('File backend', () => {
       topic: 'foo.bar',
       body: Buffer.from('hi there')
     })
-    const queuePath = fileBackend['getQueuePath'](subscriber1.queueName)
 
     await fileBackend.subscribe(subscriber1)
     await fileBackend.publish(message)
 
     // Once this promise resolves, we know that the message is being handled
     await handlingDfd.promise
+    const queuePath = resolve(
+      getQueuePath(resolve(path, QUEUES_DIRECTORY), subscriber1.queueName),
+      PROCESSING_DIRECTORY
+    )
     const processingFile = (await readdir(queuePath))[0]
 
     // Kill the backend's timers so it no longer touches the file
     clearAllTimers()
+
     // Make it look like the file hasn't been updated in a long time
     await utimes(
       resolve(queuePath, processingFile),
@@ -249,27 +255,24 @@ describe('File backend', () => {
       new Date('2020-01-01')
     )
 
-    // Create a new instance of the backend
-    const addedPathDfd = new Deferred()
-    const unlinkedPathDfd = new Deferred()
+    // Now prepare a new instance with a subscriber on that queue
+    const messageDfd = new Deferred()
+    const subscriber2: BackendSubscriber = {
+      ...subscriber1,
+      handle(message) {
+        messageDfd.resolve(message)
+      }
+    }
     const fileBackend2 = new FileBackend(path)
-    handles.push(() => fileBackend2.close())
-    const watcher = chokidar
-      .watch(queuePath)
-      .on('add', (path) => addedPathDfd.resolve(path))
-      .on('unlink', (path) => unlinkedPathDfd.resolve(path))
-    handles.push(() => watcher.close())
+    await fileBackend2.subscribe(subscriber2)
 
-    // When we run the timers, it should see that the file is stale and make it available for
-    // processing
-    runAllTimers()
+    // When we run the timers, it should see that the file is stale,
+    // make it available for processing, then process it
+    runOnlyPendingTimers()
 
-    // It should have renamed the file back to its original name so that it can be reprocessed
-    expect(await unlinkedPathDfd.promise).toEqual(processingFile)
-    expect(await addedPathDfd.promise).toEqual(
-      processingFile.replace('.%processing.', '')
-    )
+    expect(await messageDfd.promise).toMatchObject(message)
   })
+
   it.todo('should not recover messages that are still being processed')
   it.todo('should handle redefining queues')
   it.todo('should handle queues being redefined by another process')

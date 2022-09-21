@@ -1,5 +1,4 @@
 import { FSWatcher } from 'chokidar'
-import createDebug from 'debug'
 import { rename as renameCb, writeFile as writeFileCb } from 'fs'
 import { basename, dirname, join } from 'path'
 import { promisify } from 'util'
@@ -53,5 +52,3 @@ export function deserializeMessage(buffer: Buffer): Message<Buffer> {
 
   return { ...parsedMessage, body: Buffer.from(parsedMessage.body, 'base64') }
 }
-
-export const debug = createDebug('announce:FileBackend')

@@ -1,5 +1,6 @@
 import assert from 'assert'
 import chokidar, { FSWatcher } from 'chokidar'
+import createDebug from 'debug'
 import { EventEmitter } from 'events'
 import {
   close as closeCb,
@@ -29,7 +30,6 @@ import {
 import { MessageRouter } from './MessageRouter'
 import {
   atomicWriteFile,
-  debug,
   deserializeMessage,
   getQueueNameFromMessagePath,
   getQueuePath,
@@ -37,6 +37,7 @@ import {
 } from './util'
 import { Watchdog } from './Watchdog'
 
+const debug = createDebug('announce:FileBackend')
 const close = promisify(closeCb)
 const open = promisify(openCb)
 const readFile = promisify(readFileCb)
@@ -89,16 +90,18 @@ export class FileBackend extends EventEmitter {
   }
 
   async subscribe(subscriber: BackendSubscriber): Promise<void> {
+    const queueName = subscriber.queueName
+    const queuePath = getQueuePath(this.queuesPath, queueName)
+
     await this.ready
     await this.writeSubscriber(subscriber)
+    await this.watchdog.watch(queuePath)
 
-    const queueName = subscriber.queueName
     const existingQueue = this.queuesByName[queueName]
     if (existingQueue) {
       await existingQueue.watcher.close()
     }
 
-    const queuePath = getQueuePath(this.queuesPath, queueName)
     const messagesGlob = join(queuePath, READY_DIRECTORY, '*.json')
     const watcher = chokidar
       .watch(messagesGlob)

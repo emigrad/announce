@@ -1,7 +1,7 @@
 import chokidar, { FSWatcher } from 'chokidar'
+import createDebug from 'debug'
 import { EventEmitter } from 'events'
 import { rename as renameCb, Stats } from 'fs'
-import { Timer } from 'node'
 import { join, sep } from 'path'
 import { clearInterval } from 'timers'
 import { promisify } from 'util'
@@ -12,12 +12,13 @@ import {
   RESTORE_MESSAEGS_AFTER
 } from './constants'
 
+const debug = createDebug('announce:FileBackend:Watchdog')
 const rename = promisify(renameCb)
 
 export class Watchdog extends EventEmitter {
   private readonly processingTimesByPath: Record<string, number> = {}
   private readonly watchersByPath: Record<string, FSWatcher> = {}
-  private readonly timer: Timer
+  private readonly timer: NodeJS.Timer
 
   constructor() {
     super()
@@ -32,6 +33,10 @@ export class Watchdog extends EventEmitter {
   }
 
   async watch(path: string): Promise<void> {
+    if (this.watchersByPath[path]) {
+      return
+    }
+
     const watcher = chokidar
       .watch(join(path, PROCESSING_DIRECTORY, '*.json'), { alwaysStat: true })
       .on('add', this.fileChanged.bind(this))
@@ -47,10 +52,12 @@ export class Watchdog extends EventEmitter {
   }
 
   private fileChanged(path: string, stats: Stats) {
+    debug(`Message ${path} added or changed, modtime ${stats.mtime}`)
     this.processingTimesByPath[path] = stats.mtimeMs
   }
 
   private fileUnlinked(path: string) {
+    debug(`Message ${path} removed`)
     delete this.processingTimesByPath[path]
   }
 
@@ -66,6 +73,7 @@ export class Watchdog extends EventEmitter {
   private async restorePath(path: string): Promise<void> {
     try {
       await rename(path, getReadyPath(path))
+      debug(`Restored crashed message ${path}`)
     } catch (e: unknown) {
       if ((e as { code?: string }).code === 'ENOENT') {
         // If the file has already disappeared there's nothing else we need to do
