@@ -137,6 +137,7 @@ export class FileBackend extends EventEmitter {
 
     if (queue) {
       await queue.watcher.close()
+      this.watchdog.unwatch(getQueuePath(this.queuesPath, queueName))
       delete this.queuesByName[queueName]
     }
 

@@ -1,7 +1,11 @@
-import chokidar, { FSWatcher } from 'chokidar'
 import createDebug from 'debug'
 import { EventEmitter } from 'events'
-import { rename as renameCb, Stats } from 'fs'
+import {
+  readdir as readdirCb,
+  rename as renameCb,
+  stat as statCb,
+  Stats
+} from 'fs'
 import { join, sep } from 'path'
 import { clearInterval } from 'timers'
 import { promisify } from 'util'
@@ -9,16 +13,17 @@ import {
   KEEPALIVE_INTERVAL,
   PROCESSING_DIRECTORY,
   READY_DIRECTORY,
-  RESTORE_MESSAEGS_AFTER
+  RESTORE_MESSAGES_AFTER
 } from './constants'
-import { isFileNotFoundError } from './util'
+import { ignoreFileNotFoundErrors, isFileNotFoundError } from './util'
 
 const debug = createDebug('announce:FileBackend:Watchdog')
+const readdir = promisify(readdirCb)
 const rename = promisify(renameCb)
+const stat = promisify(statCb)
 
 export class Watchdog extends EventEmitter {
-  private readonly processingTimesByPath: Record<string, number> = {}
-  private readonly watchersByPath: Record<string, FSWatcher> = {}
+  private readonly watchedPaths: Set<string> = new Set()
   private readonly timer: NodeJS.Timer
 
   constructor() {
@@ -33,40 +38,28 @@ export class Watchdog extends EventEmitter {
     }, KEEPALIVE_INTERVAL).unref()
   }
 
-  async watch(path: string): Promise<void> {
-    if (this.watchersByPath[path]) {
-      return
-    }
-
-    const watcher = chokidar
-      .watch(join(path, PROCESSING_DIRECTORY, '*.json'), { alwaysStat: true })
-      .on('add', this.fileChanged.bind(this))
-      .on('change', this.fileChanged.bind(this))
-      .on('unlink', this.fileUnlinked.bind(this))
-
-    this.watchersByPath[path] = watcher
-
-    return new Promise((resolve, reject) => {
-      watcher.on('ready', resolve)
-      watcher.on('error', reject)
-    })
+  watch(path: string) {
+    this.watchedPaths.add(path)
   }
 
-  private fileChanged(path: string, stats: Stats) {
-    debug(`Message ${path} added or changed, modtime ${stats.mtime}`)
-    this.processingTimesByPath[path] = stats.mtimeMs
-  }
-
-  private fileUnlinked(path: string) {
-    debug(`Message ${path} removed`)
-    delete this.processingTimesByPath[path]
+  unwatch(path: string) {
+    this.watchedPaths.delete(path)
   }
 
   private async checkWatchedMessages(): Promise<void> {
-    const restoreCutoff = Date.now() - RESTORE_MESSAEGS_AFTER
-    const pathsToRestore = Object.keys(this.processingTimesByPath).filter(
-      (path) => this.processingTimesByPath[path] < restoreCutoff
+    const restoreCutoff = new Date(Date.now() - RESTORE_MESSAGES_AFTER)
+    const watchedPaths = Array.from(this.watchedPaths.values())
+    debug(
+      `Restoring any messages in ${JSON.stringify(
+        watchedPaths.map((path) => join(path, PROCESSING_DIRECTORY, '*.json'))
+      )} last touched before ${restoreCutoff}`
     )
+
+    const jsonFiles = await Promise.all(watchedPaths.map(listJsonFiles))
+    const mtimes = await getMtimes(jsonFiles.flat())
+    const pathsToRestore = Object.entries(mtimes)
+      .filter((entry) => entry[1] < restoreCutoff)
+      .map(([path]) => path)
 
     await Promise.all(pathsToRestore.map((path) => this.restorePath(path)))
   }
@@ -86,9 +79,6 @@ export class Watchdog extends EventEmitter {
 
   async close() {
     clearInterval(this.timer)
-    await Promise.all(
-      Object.values(this.watchersByPath).map((watcher) => watcher.close())
-    )
   }
 }
 
@@ -97,4 +87,30 @@ function getReadyPath(processingPath: string): string {
   pathParts[pathParts.length - 2] = READY_DIRECTORY
 
   return pathParts.join(sep)
+}
+
+async function listJsonFiles(path: string): Promise<string[]> {
+  const baseDir = join(path, PROCESSING_DIRECTORY)
+  const files = await ignoreFileNotFoundErrors(readdir(baseDir))
+
+  return (files ?? [])
+    .filter((filename) => filename.endsWith('.json'))
+    .map((filename) => join(baseDir, filename))
+}
+
+async function getMtimes(
+  paths: readonly string[]
+): Promise<Record<string, Date>> {
+  const statsEntries: ([string, Stats] | undefined)[] = await Promise.all(
+    paths.map(async (path) => {
+      const stats = await ignoreFileNotFoundErrors(stat(path))
+
+      return stats && [path, stats]
+    })
+  )
+  const mtimeEntries = statsEntries
+    .filter((entry): entry is [string, Stats] => !!entry)
+    .map(([path, stat]) => [path, stat.mtime])
+
+  return Object.fromEntries(mtimeEntries)
 }

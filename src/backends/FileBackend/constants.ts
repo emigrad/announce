@@ -7,4 +7,4 @@ export const PROCESSING_DIRECTORY = 'processing'
 export const KEEPALIVE_INTERVAL = 10000
 // How far in the past the modtime on the processing file must be
 // before the process is considered to be crashed
-export const RESTORE_MESSAEGS_AFTER = 60000
+export const RESTORE_MESSAGES_AFTER = 60000
