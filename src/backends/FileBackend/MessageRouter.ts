@@ -1,5 +1,6 @@
 import chokidar, { FSWatcher } from 'chokidar'
 import createDebug from 'debug'
+import { EventEmitter } from 'events'
 import { mkdir as mkdirCb, readFile as readFileCb } from 'fs'
 import { join, resolve } from 'path'
 import { prop } from 'rambda'
@@ -25,7 +26,7 @@ const debug = createDebug('announce:FileBackend:MessageRouter')
 const mkdir = promisify(mkdirCb)
 const readFile = promisify(readFileCb)
 
-export class MessageRouter {
+export class MessageRouter extends EventEmitter {
   public readonly ready: Promise<void>
   private readonly queuesPath: string
   private readonly subscriptionsPath: string
@@ -34,6 +35,8 @@ export class MessageRouter {
   private readonly timers: NodeJS.Timer[] = []
 
   constructor(basePath: string) {
+    super()
+
     this.queuesPath = resolve(basePath, QUEUES_DIRECTORY)
     this.subscriptionsPath = resolve(basePath, SUBSCRIPTIONS_DIRECTORY)
 
@@ -76,6 +79,7 @@ export class MessageRouter {
       .watch(join(this.subscriptionsPath, '*.json'))
       .on('add', (path) => {
         const promise = this.onSubscriberChanged(path)
+        this.watchPromise(promise)
 
         if (startingUp) {
           // Don't record the promise once we've started up because that
@@ -83,7 +87,7 @@ export class MessageRouter {
           startupPromises.push(promise)
         }
       })
-      .on('change', (path) => this.onSubscriberChanged(path))
+      .on('change', (path) => this.watchPromise(this.onSubscriberChanged(path)))
       .on('unlink', (path) => this.onSubscriberRemoved(path))
 
     await waitForReady(this.subscriptionsWatcher)
@@ -135,6 +139,13 @@ export class MessageRouter {
       fileContents.toString()
     )
 
+    await this.updateSubscriber(externalSubscriber)
+    this.scheduleQueueRecheck(path)
+  }
+
+  private async updateSubscriber(
+    externalSubscriber: ExternalSubscriber
+  ): Promise<void> {
     if (
       JSON.stringify(externalSubscriber) !==
       JSON.stringify(this.externalSubscribers[externalSubscriber.queueName])
@@ -143,20 +154,23 @@ export class MessageRouter {
       this.externalSubscribers[externalSubscriber.queueName] =
         externalSubscriber
 
-      debug(`Subscriber changed: ${path}`)
+      debug(`Subscriber for queue ${externalSubscriber.queueName} changed`)
     }
+  }
 
+  private scheduleQueueRecheck(path: string) {
     // If the file changes several times in rapid succession, we may
     // not receive notifications for the subsequent updates, so check
     // back in a second to ensure our in-memory copy isn't stale
     const timer = setTimeout(() => {
       this.timers.splice(this.timers.indexOf(timer), 1)
-      this.onSubscriberChanged(path)
+      this.watchPromise(this.onSubscriberChanged(path))
     }, 1000)
+
     this.timers.push(timer)
   }
 
-  private async onSubscriberRemoved(path: string): Promise<void> {
+  private onSubscriberRemoved(path: string) {
     delete this.externalSubscribers[getQueueNameFromSubscriberPath(path)]
 
     debug(`Subscriber removed: ${path}`)
@@ -179,6 +193,10 @@ export class MessageRouter {
         recursive: true
       }
     )
+  }
+
+  private watchPromise<T>(promise: Promise<T>) {
+    promise.catch((e) => this.emit('error', e))
   }
 }
 

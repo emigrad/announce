@@ -150,11 +150,14 @@ export class FileBackend extends EventEmitter {
   }
 
   async close(): Promise<void> {
-    await this.ready
-    await this.watchdog.close()
+    this.watchdog.close()
     await this.messageRouter.close()
-    const watchers = Object.values(this.queuesByName).map(prop('watcher'))
 
+    await this.ready.catch(() => {
+      // Squelch - we need to clean up even if this fails
+    })
+
+    const watchers = Object.values(this.queuesByName).map(prop('watcher'))
     await Promise.all(watchers.map((watcher) => watcher.close()))
 
     debug('Closed')
@@ -176,6 +179,10 @@ export class FileBackend extends EventEmitter {
   }
 
   private async initialize(): Promise<void> {
+    this.watchdog.on('error', (e) => this.emit('error', e))
+    this.messageRouter.on('error', (e) => this.emit('error', e))
+    this.on('error', () => this.close())
+
     await this.messageRouter.ready
   }
 

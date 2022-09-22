@@ -77,7 +77,7 @@ export class Watchdog extends EventEmitter {
     }
   }
 
-  async close() {
+  close() {
     clearInterval(this.timer)
   }
 }
