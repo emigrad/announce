@@ -10,7 +10,7 @@ import {
 } from 'fs'
 import { glob as globCb } from 'glob'
 import { tmpdir } from 'os'
-import { basename, join, resolve } from 'path'
+import { join, resolve } from 'path'
 import rimrafCb from 'rimraf'
 import { Deferred } from 'ts-deferred'
 import { promisify } from 'util'
@@ -28,8 +28,6 @@ import {
   SUBSCRIPTIONS_DIRECTORY
 } from './constants'
 import { FileBackend } from './FileBackend'
-import { getQueuePath } from './util'
-import clearAllTimers = jest.clearAllTimers
 import runOnlyPendingTimers = jest.runOnlyPendingTimers
 
 const chmod = promisify(chmodCb)
@@ -237,82 +235,6 @@ describe('File backend', () => {
     }
   )
 
-  it.each([true, false])(
-    'should only recover crashed messages (crashed: %p)',
-    async (crashed) => {
-      // chokidar uses nextTick() to fire the ready event
-      jest.useFakeTimers({ doNotFake: ['nextTick'] })
-
-      // Simulate a crashed process by creating a handler that never returns,
-      // then shutting down the keepalive timer that updates the modtime of
-      // the processing file
-      const handlingDfd = new Deferred()
-      const subscriber1: BackendSubscriber = {
-        queueName: 'test',
-        topics: ['foo.bar'],
-        handle: () =>
-          new Promise(() => {
-            handlingDfd.resolve()
-            // Never resolve
-          })
-      }
-      const message = getCompleteMessage({
-        topic: 'foo.bar',
-        body: Buffer.from('hi there')
-      })
-
-      await fileBackend.subscribe(subscriber1)
-      await fileBackend.publish(message)
-
-      // Once this promise resolves, we know that the message is being handled
-      await handlingDfd.promise
-      const queuePath = resolve(
-        getQueuePath(
-          resolve(basePath, QUEUES_DIRECTORY),
-          subscriber1.queueName
-        ),
-        PROCESSING_DIRECTORY
-      )
-      const processingFile = await getFirstFile(queuePath)
-
-      // Kill the backend's timers so it no longer touches the file
-      clearAllTimers()
-
-      if (crashed) {
-        // Make it look like the file hasn't been updated in a long time
-        await utimes(
-          resolve(queuePath, processingFile),
-          new Date('2020-01-01'),
-          new Date('2020-01-01')
-        )
-      }
-
-      // Now prepare a new instance with a subscriber on that queue
-      const messageDfd = new Deferred()
-      const subscriber2: BackendSubscriber = {
-        ...subscriber1,
-        handle(message) {
-          messageDfd.resolve(message)
-        }
-      }
-      const fileBackend2 = new FileBackend(basePath)
-      handles.push(() => fileBackend2.close())
-      await fileBackend2.subscribe(subscriber2)
-
-      // When we run the timers, it should see that the file is stale,
-      // make it available for processing, then process it
-      runOnlyPendingTimers()
-
-      if (crashed) {
-        expect(await messageDfd.promise).toMatchObject(message)
-      } else {
-        expect(basename(await getFirstFile(queuePath))).toEqual(
-          basename(processingFile)
-        )
-      }
-    }
-  )
-
   it('should handle rebinding queues', async () => {
     const emitter = new EventEmitter()
     const testSubscription1: BackendSubscriber = {
@@ -434,7 +356,6 @@ describe('File backend', () => {
     expect(errors).toHaveLength(0)
   })
 
-  // it('should handle messages that were added before startup', async () => {})
   it('should handle multiple messages with the same ID', async () => {
     const message = getCompleteMessage({
       topic: 'test',
