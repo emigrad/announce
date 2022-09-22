@@ -1,6 +1,7 @@
 import * as Buffer from 'buffer'
 import { EventEmitter } from 'events'
 import { Message } from './Message'
+import { Middleware } from './Middleware'
 import { SubscriberOptions } from './Subscriber'
 
 export interface Backend extends Pick<EventEmitter, 'on'> {
@@ -15,9 +16,21 @@ export interface Backend extends Pick<EventEmitter, 'on'> {
   subscribe(subscriber: BackendSubscriber): Promise<void>
 
   /**
+   * Binds a queue to the given topics, causing that queue
+   * to receive any messages sent to those topics
+   */
+  bindQueue: (queueName: string, topics: readonly string[]) => Promise<unknown>
+
+  /**
    * Closes the connection
    */
   close(): Promise<void>
+
+  /**
+   * Returns the polyfill middlewares the backend needs to provide all
+   * the expected capabilities
+   */
+  getPolyfills(): Middleware[]
 }
 
 export interface BackendConstructor {

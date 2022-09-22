@@ -49,6 +49,7 @@ export class Announce extends EventEmitter {
       )
     }
 
+    this.use(...backend.getPolyfills())
     this.backend = backend
     this.backend.on('error', this.destroy.bind(this))
   }

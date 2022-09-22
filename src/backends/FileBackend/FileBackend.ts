@@ -15,7 +15,8 @@ import { prop, uniq } from 'rambda'
 import rimrafCb from 'rimraf'
 import { clearInterval } from 'timers'
 import { promisify } from 'util'
-import { BackendSubscriber, Message } from '../../types'
+import { deadLetterQueue } from '../../polyfills'
+import { Backend, BackendSubscriber, Message, Middleware } from '../../types'
 import { getConcurrency } from '../../util'
 import {
   KEEPALIVE_INTERVAL,
@@ -59,7 +60,7 @@ const unlink = promisify(unlinkCb)
  *  - guaranteed delivery
  *  - dead letter queues
  */
-export class FileBackend extends EventEmitter {
+export class FileBackend extends EventEmitter implements Backend {
   public readonly ready: Promise<void>
   private readonly queuesPath: string
   private readonly subscriptionsPath: string
@@ -176,6 +177,10 @@ export class FileBackend extends EventEmitter {
     topics: readonly string[]
   ): Promise<void> {
     await this.updateTopics(queueName, [], topics)
+  }
+
+  getPolyfills(): Middleware[] {
+    return [deadLetterQueue(this)]
   }
 
   private async initialize(): Promise<void> {

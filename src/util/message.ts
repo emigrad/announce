@@ -86,6 +86,8 @@ export function getDeadLetterQueueName(
   return getDeadLetterTopic(subscriber)
 }
 
+// export function getOriginalQueueName()
+
 /**
  * Returns the value of the given header
  */

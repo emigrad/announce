@@ -1,41 +1,126 @@
-import { Message } from '../types'
-import { LocalBackend } from './LocalBackend'
+import assert from 'assert'
+import createDebug from 'debug'
+import { EventEmitter } from 'events'
+import { deadLetterQueue } from '../polyfills'
+import { Backend, BackendSubscriber, Message, Middleware } from '../types'
+import { getConcurrency } from '../util'
+
+const debug = createDebug('announce:InMemory')
 
 /**
  * An in-memory backend for running tests etc. Not suitable for production
- * use as application shut downs can cause the loss of unprocessed messages
- *
- * Supports:
- *
- * Does not support:
- *  - guaranteed delivery
- *  - dead letter queues
- *  - inter-service messaging
- *  - multiple instances
+ * use as unprocessed messages are lost when the application shuts down
  */
-export class InMemoryBackend extends LocalBackend {
+export class InMemoryBackend extends EventEmitter implements Backend {
+  private readonly queuesByName: Record<string, Queue> = {}
+
   static accepts(url: string) {
     return url.startsWith('memory://')
   }
 
-  constructor() {
-    super()
+  async subscribe(subscriber: BackendSubscriber): Promise<void> {
+    const queue = this.getQueue(subscriber.queueName)
+    queue.subscriber = subscriber
+
+    await this.bindQueue(subscriber.queueName, subscriber.topics)
   }
 
   /**
    * Publishes the message to all interested subscribers
    */
   async publish(message: Message<Buffer>) {
-    this.getMatchingSubscribers(message).forEach((subscriber) =>
-      subscriber.queue.add(async () => {
-        try {
-          await subscriber.handle(message)
-        } catch (e) {
-          // Squelch - use middleware to process errors
-        }
-      })
+    this.getBoundQueues(message.topic).forEach((queue) => {
+      queue.pendingMessages.push(message)
+      this.watchPromise(this.processNextMessage(queue.name))
+    })
+  }
+
+  async bindQueue(queueName: string, topics: readonly string[]): Promise<void> {
+    const queue = this.getQueue(queueName)
+    const existingBindings = queue.bindings
+    const newBindings = topics.filter(
+      (topic) => !existingBindings.includes(topic)
     )
 
-    return Promise.resolve()
+    queue.bindings = [...existingBindings, ...newBindings]
   }
+
+  async close() {
+    Object.keys(this.queuesByName).forEach((queueName) => {
+      delete this.queuesByName[queueName]
+    })
+  }
+
+  getPolyfills(): Middleware[] {
+    return [deadLetterQueue(this)]
+  }
+
+  private getQueue(queueName: string): Queue
+  private getQueue(queueName: string, createIfMissing: false): Queue | undefined
+  private getQueue(queueName: string, createIfMissing = true) {
+    if (!this.queuesByName[queueName] && createIfMissing) {
+      this.queuesByName[queueName] = {
+        name: queueName,
+        bindings: [],
+        pendingMessages: [],
+        numMessagesProcessing: 0
+      }
+    }
+
+    return this.queuesByName[queueName]
+  }
+
+  private getBoundQueues(topic: string): Queue[] {
+    return Object.values(this.queuesByName).filter(({ bindings }) => {
+      return bindings.some((binding) =>
+        getTopicSelectorRegExp(binding).test(topic)
+      )
+    })
+  }
+
+  private async processNextMessage(queueName: string): Promise<void> {
+    const queue = this.getQueue(queueName, false)
+    const subscriber = queue?.subscriber
+
+    if (
+      subscriber &&
+      queue.pendingMessages.length &&
+      queue.numMessagesProcessing < getConcurrency(subscriber)
+    ) {
+      const message = queue.pendingMessages.shift()
+      assert(message)
+      queue.numMessagesProcessing++
+
+      try {
+        await subscriber.handle(message)
+      } catch (e) {
+        // The deadLetterQueue polyfill provides dead letter support, so
+        // normally we will never reach this point
+        debug(`Message ${message.properties.id} was rejected`)
+      } finally {
+        queue.numMessagesProcessing--
+        this.watchPromise(this.processNextMessage(queueName))
+      }
+    }
+  }
+
+  private watchPromise(promise: Promise<unknown>) {
+    promise.catch((e) => this.emit('error', e))
+  }
+}
+
+function getTopicSelectorRegExp(topicSelector: string): RegExp {
+  const regExpStr = topicSelector
+    .replace(/\./g, '\\.')
+    .replace(/\*\*?/g, (match) => (match === '**' ? '.*' : '[^.]+'))
+
+  return new RegExp(`^${regExpStr}$`)
+}
+
+interface Queue {
+  name: string
+  bindings: string[]
+  subscriber?: BackendSubscriber
+  pendingMessages: Message<Buffer>[]
+  numMessagesProcessing: number
 }

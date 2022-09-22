@@ -3,7 +3,7 @@ import { ConsumeMessage, Options } from 'amqplib/properties'
 import assert from 'assert'
 import cuid from 'cuid'
 import { EventEmitter } from 'events'
-import { Backend, BackendSubscriber, Message } from '../types'
+import { Backend, BackendSubscriber, Message, Middleware } from '../types'
 import {
   getConcurrency,
   getDeadLetterQueueName,
@@ -99,6 +99,16 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     await this.consume(subscriber)
   }
 
+  async bindQueue(queueName: string, topics: readonly string[]) {
+    const channel = await this.getPublishChannel()
+
+    await Promise.all(
+      topics.map((topic) =>
+        channel.bindQueue(queueName, this.exchange, topic.replace(/\*/g, '#'))
+      )
+    )
+  }
+
   async close(reason = 'Connection has been closed'): Promise<void> {
     if (!this.closePromise) {
       const connectionPromise = this.connection
@@ -125,6 +135,10 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     }
 
     return this.closePromise
+  }
+
+  getPolyfills(): Middleware[] {
+    return []
   }
 
   private async getPublishChannel(): Promise<ConfirmChannel> {
@@ -205,15 +219,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
       await channel.bindQueue(deadLetterQueue, this.exchange, deadLetterTopic)
     }
 
-    await Promise.all(
-      subscriber.topics.map((topic) =>
-        channel.bindQueue(
-          subscriber.queueName,
-          this.exchange,
-          topic.replace(/\*/g, '#')
-        )
-      )
-    )
+    await this.bindQueue(subscriber.queueName, subscriber.topics)
   }
 
   private async consume(subscriber: BackendSubscriber): Promise<void> {
