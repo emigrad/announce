@@ -243,7 +243,7 @@ export class FileBackend extends EventEmitter {
     }
   }
 
-  private async processNextMessage(queueName: string): Promise<void> {
+  private processNextMessage(queueName: string) {
     const queue = this.queuesByName[queueName] as Queue | undefined
 
     if (
@@ -257,51 +257,67 @@ export class FileBackend extends EventEmitter {
     const messagePath = queue.pendingMessages.shift()
     assert(messagePath)
 
+    queue.processingQueue
+      .add(() => this.lockAndProcessMessage(queue, messagePath))
+      .then(
+        () => this.processNextMessage(queueName),
+        (e) => this.emit('error', e)
+      )
+  }
+
+  private async lockAndProcessMessage(
+    queue: Queue,
+    messagePath: string
+  ): Promise<void> {
+    const processingPath = await this.lockMessage(messagePath)
+    if (!processingPath) {
+      return
+    }
+    const keepaliveTimer = setInterval(() => {
+      this.watchPromise(touch(processingPath))
+    }, KEEPALIVE_INTERVAL)
+
+    try {
+      debug(`Processing message ${messagePath}`)
+      await this.processMessage(queue, processingPath)
+    } finally {
+      clearInterval(keepaliveTimer)
+      this.watchPromise(ignoreFileNotFoundErrors(unlink(processingPath)))
+    }
+    debug(`Message processed: ${messagePath}`)
+  }
+
+  private async lockMessage(messagePath: string): Promise<string | undefined> {
     const processingPath = getProcessingPath(messagePath)
 
-    queue.processingQueue
-      .add(async () => {
-        try {
-          // Attempt to "lock" the file
-          await rename(messagePath, processingPath)
-        } catch (e: unknown) {
-          if (isFileNotFoundError(e)) {
-            // Some other process has already locked this message
-            return
-          } else {
-            throw e
-          }
-        }
+    try {
+      // Attempt to "lock" the file
+      await rename(messagePath, processingPath)
 
-        debug(`Processing message ${messagePath}`)
-        await this.processMessage(queue, processingPath)
-        debug(`Message processed: ${messagePath}`)
-      })
-      .finally(() => this.processNextMessage(queueName))
+      return processingPath
+    } catch (e: unknown) {
+      if (isFileNotFoundError(e)) {
+        // Some other process has already locked this message
+        return
+      } else {
+        throw e
+      }
+    }
   }
 
   private async processMessage(
     queue: Queue,
-    messagePath: string
+    processingPath: string
   ): Promise<void> {
-    const keepaliveTimer = setInterval(async () => {
-      // TODO: unhandled promise
-      await touch(messagePath)
-    }, KEEPALIVE_INTERVAL)
+    const message = await this.loadMessage(processingPath)
+    const subscriber = queue.subscriber
 
     try {
-      const message = await this.loadMessage(messagePath)
-      const subscriber = queue.subscriber
-
-      try {
-        await subscriber.handle(message)
-      } catch (e) {
-        // The deadLetterQueue polyfill provides dead letter support
-        debug(`Message ${message.properties.id} was rejected`)
-      }
-    } finally {
-      await ignoreFileNotFoundErrors(unlink(messagePath))
-      clearInterval(keepaliveTimer)
+      await subscriber.handle(message)
+    } catch (e) {
+      // The deadLetterQueue polyfill provides dead letter support, so
+      // normally we will never reach this point
+      debug(`Message ${message.properties.id} was rejected`)
     }
   }
 
@@ -328,6 +344,10 @@ export class FileBackend extends EventEmitter {
       }
     }
     debug(`Message removed: ${path}`)
+  }
+
+  private watchPromise(promise: Promise<unknown>) {
+    promise.catch((e) => this.emit('error', e))
   }
 }
 

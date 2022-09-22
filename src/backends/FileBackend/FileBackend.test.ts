@@ -1,9 +1,16 @@
 import assert from 'assert'
 import { createHash } from 'crypto'
 import { EventEmitter } from 'events'
-import { readdir as readdirCb, utimes as utimesCb } from 'fs'
+import {
+  chmod as chmodCb,
+  readdir as readdirCb,
+  stat as statCb,
+  utimes as utimesCb,
+  writeFile as writeFileCb
+} from 'fs'
+import { glob as globCb } from 'glob'
 import { tmpdir } from 'os'
-import { resolve } from 'path'
+import { basename, join, resolve } from 'path'
 import rimrafCb from 'rimraf'
 import { Deferred } from 'ts-deferred'
 import { promisify } from 'util'
@@ -15,25 +22,40 @@ import {
   getDeadLetterQueueName,
   getDeadLetterTopic
 } from '../../util'
-import { PROCESSING_DIRECTORY, QUEUES_DIRECTORY } from './constants'
+import {
+  PROCESSING_DIRECTORY,
+  QUEUES_DIRECTORY,
+  SUBSCRIPTIONS_DIRECTORY
+} from './constants'
 import { FileBackend } from './FileBackend'
 import { getQueuePath } from './util'
 import clearAllTimers = jest.clearAllTimers
 import runOnlyPendingTimers = jest.runOnlyPendingTimers
 
+const chmod = promisify(chmodCb)
+const glob = promisify(globCb)
 const readdir = promisify(readdirCb)
 const rimraf = promisify(rimrafCb)
+const stat = promisify(statCb)
+const writeFile = promisify(writeFileCb)
 const utimes = promisify(utimesCb)
+
+const READ_ONLY = 0o500
+const ALL_PERMS = 0o700
 
 describe('File backend', () => {
   const hash = createHash('md5').update(__filename).digest('hex').toString()
-  const path = resolve(tmpdir(), hash)
+  const basePath = resolve(tmpdir(), hash)
   let handles: (() => unknown)[]
   let fileBackend: FileBackend
 
   beforeEach(async () => {
-    await rimraf(path)
-    fileBackend = new FileBackend(path)
+    // Some tests set read-only permissions, so we need to clear that
+    // before attempting to delete the files
+    const existingFiles = await glob(resolve(basePath, '**'))
+    await Promise.all(existingFiles.map((path) => chmod(path, ALL_PERMS)))
+    await rimraf(basePath)
+    fileBackend = new FileBackend(basePath)
     await fileBackend.ready
     handles = []
   })
@@ -159,13 +181,13 @@ describe('File backend', () => {
       body: Buffer.from('hi there')
     })
 
-    const fileBackend1 = new FileBackend(path)
+    const fileBackend1 = new FileBackend(basePath)
     handles.push(() => fileBackend1.close())
     await fileBackend1.subscribe(subscriber)
     await fileBackend1.publish(message)
     await dfd.promise
 
-    const fileBackend2 = new FileBackend(path)
+    const fileBackend2 = new FileBackend(basePath)
     handles.push(() => fileBackend2.close())
     await fileBackend2.subscribe(subscriber)
 
@@ -245,10 +267,13 @@ describe('File backend', () => {
       // Once this promise resolves, we know that the message is being handled
       await handlingDfd.promise
       const queuePath = resolve(
-        getQueuePath(resolve(path, QUEUES_DIRECTORY), subscriber1.queueName),
+        getQueuePath(
+          resolve(basePath, QUEUES_DIRECTORY),
+          subscriber1.queueName
+        ),
         PROCESSING_DIRECTORY
       )
-      const processingFile = (await readdir(queuePath))[0]
+      const processingFile = await getFirstFile(queuePath)
 
       // Kill the backend's timers so it no longer touches the file
       clearAllTimers()
@@ -270,7 +295,7 @@ describe('File backend', () => {
           messageDfd.resolve(message)
         }
       }
-      const fileBackend2 = new FileBackend(path)
+      const fileBackend2 = new FileBackend(basePath)
       handles.push(() => fileBackend2.close())
       await fileBackend2.subscribe(subscriber2)
 
@@ -281,7 +306,9 @@ describe('File backend', () => {
       if (crashed) {
         expect(await messageDfd.promise).toMatchObject(message)
       } else {
-        expect(await readdir(queuePath)).toEqual([processingFile])
+        expect(basename(await getFirstFile(queuePath))).toEqual(
+          basename(processingFile)
+        )
       }
     }
   )
@@ -312,7 +339,7 @@ describe('File backend', () => {
       )
     }, 50)
     await fileBackend.subscribe(testSubscription1)
-    const fileBackend2 = new FileBackend(path)
+    const fileBackend2 = new FileBackend(basePath)
     handles.push(
       () => fileBackend2.close(),
       () => clearInterval(interval)
@@ -361,7 +388,7 @@ describe('File backend', () => {
       topic: subscriber.topics[0],
       body: Buffer.from('hello')
     })
-    const fileBackend2 = new FileBackend(path)
+    const fileBackend2 = new FileBackend(basePath)
     handles.push(() => fileBackend2.close())
     await fileBackend.subscribe(subscriber)
     await fileBackend2.subscribe(subscriber)
@@ -426,13 +453,13 @@ describe('File backend', () => {
         }
       }
     }
-    const fileBackend2 = new FileBackend(path)
+    const fileBackend2 = new FileBackend(basePath)
     await fileBackend2.subscribe(subscriber)
     await fileBackend2.close()
 
     // Have to use a new instance because we can't guarantee when fileBackend
     // will receive notification that there's a new subscription
-    const fileBackend3 = new FileBackend(path)
+    const fileBackend3 = new FileBackend(basePath)
     handles.push(() => fileBackend3.close())
     await fileBackend3.ready
     await fileBackend3.publish(message)
@@ -445,5 +472,182 @@ describe('File backend', () => {
     ])
   })
 
-  it.todo('message processing stress test')
+  it('should emit errors received from the watchdog', async () => {
+    const error = new Error('Oh no')
+    const deferred = new Deferred()
+    fileBackend.on('error', (e) => deferred.resolve(e))
+
+    fileBackend['watchdog'].emit('error', error)
+
+    expect(await deferred.promise).toBe(error)
+  })
+
+  it('should emit errors received from the message router', async () => {
+    const error = new Error('Oh no')
+    const deferred = new Deferred()
+    fileBackend.on('error', (e) => deferred.resolve(e))
+
+    fileBackend['messageRouter'].emit('error', error)
+
+    expect(await deferred.promise).toBe(error)
+  })
+
+  it('should emit an error if startup fails', async () => {
+    await fileBackend.close()
+
+    const deferred = new Deferred()
+    await writeFile(
+      resolve(basePath, SUBSCRIPTIONS_DIRECTORY, 'test.json'),
+      'invalid JSON'
+    )
+    fileBackend = new FileBackend(basePath)
+    fileBackend.on('error', (error) => deferred.resolve(error))
+
+    expect(await deferred.promise).toBeInstanceOf(Error)
+  })
+
+  it("should touch the messages it's processing to stop the watchdog from restoring them", async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick'] })
+    await fileBackend.close()
+    fileBackend = new FileBackend(basePath)
+
+    const processingDeferred = new Deferred()
+    const subscriber: BackendSubscriber = {
+      queueName: 'touchtest',
+      topics: ['test'],
+      handle() {
+        return new Promise(() => {
+          processingDeferred.resolve()
+          // Never resolve
+        })
+      }
+    }
+    await fileBackend.subscribe(subscriber)
+    await fileBackend.publish(
+      getCompleteMessage({ topic: 'test', body: Buffer.from('hi there') })
+    )
+    await processingDeferred.promise
+
+    const processingPath = resolve(
+      basePath,
+      QUEUES_DIRECTORY,
+      subscriber.queueName,
+      PROCESSING_DIRECTORY
+    )
+    const messageFile = await getFirstFile(processingPath)
+    await utimes(messageFile, new Date('2020-01-01'), new Date('2020-01-01'))
+
+    runOnlyPendingTimers()
+
+    const stats = await stat(messageFile)
+    expect(stats.mtimeMs).toBeGreaterThan(Date.now() / 1000 - 1)
+  })
+
+  it('should correctly replace subscribers', async () => {
+    const messageTopics: string[] = []
+    const messagesDeferred = new Deferred()
+    const subscriber1: BackendSubscriber = {
+      queueName: 'replacementtest',
+      topics: ['test1'],
+      handle(message) {
+        messageTopics.push(message.topic)
+
+        if (messageTopics.length === 2) {
+          messagesDeferred.resolve()
+        }
+      }
+    }
+    const subscriber2: BackendSubscriber = {
+      ...subscriber1,
+      topics: ['test2']
+    }
+    // Topics are cumulative unless explicitly unbound, so we should
+    // receive both messages
+    const message1: Message<Buffer> = getCompleteMessage({
+      topic: 'test1',
+      body: Buffer.from('hi there')
+    })
+    const message2: Message<Buffer> = { ...message1, topic: 'test2' }
+
+    await fileBackend.subscribe(subscriber1)
+    await fileBackend.subscribe(subscriber2)
+    await fileBackend.publish(message1)
+    await fileBackend.publish(message2)
+
+    await messagesDeferred.promise
+
+    expect(messageTopics.sort()).toEqual(['test1', 'test2'])
+  })
+
+  it('should ignore notifications about queues that have been removed', async () => {
+    await fileBackend['onMessageAdded']('non-existent-queue')
+  })
+
+  it('should emit an error if locking a message fails', async () => {
+    await fileBackend.bindQueue('test-locking', ['test'])
+    await fileBackend.publish(
+      getCompleteMessage({ topic: 'test', body: Buffer.from('hi there') })
+    )
+
+    await chmod(
+      join(basePath, QUEUES_DIRECTORY, 'test-locking', PROCESSING_DIRECTORY),
+      READ_ONLY
+    )
+
+    const errorDeferred = new Deferred()
+    fileBackend.on('error', (error) => errorDeferred.resolve(error))
+
+    await fileBackend.subscribe({
+      queueName: 'test-locking',
+      topics: ['test'],
+      handle: () => {
+        console.log('fdsaf')
+        // Do nothing
+      }
+    })
+
+    expect(await errorDeferred.promise).toMatchObject({ code: 'EACCES' })
+  })
+
+  it('should emit an error if there is a problem removing the processing file', async () => {
+    const processingDeferred = new Deferred()
+    const setPermissionsDeferred = new Deferred()
+    const errorDeferred = new Deferred()
+    fileBackend.on('error', (error) => errorDeferred.resolve(error))
+    await fileBackend.subscribe({
+      queueName: 'test-processing',
+      topics: ['test'],
+      handle: async () => {
+        processingDeferred.resolve()
+        await setPermissionsDeferred.promise
+      }
+    })
+    await fileBackend.publish(
+      getCompleteMessage({ topic: 'test', body: Buffer.from('hi there') })
+    )
+
+    await processingDeferred.promise
+    await chmod(
+      join(basePath, QUEUES_DIRECTORY, 'test-processing', PROCESSING_DIRECTORY),
+      READ_ONLY
+    )
+    setPermissionsDeferred.resolve()
+
+    expect(await errorDeferred.promise).toMatchObject({ code: 'EACCES' })
+  })
+
+  it('should ignore notifications about messages being removed from queues that no longer have subscribers', async () => {
+    await fileBackend['onMessageUnlinked']('non-existent-queue')
+  })
+
+  it("should ignore attempts to delete queues that don't exist", async () => {
+    await fileBackend.deleteQueue('non-existent-queue')
+  })
+
+  async function getFirstFile(path: string): Promise<string> {
+    const files = await readdir(path)
+    assert(files.length === 1)
+
+    return join(path, files[0])
+  }
 })
