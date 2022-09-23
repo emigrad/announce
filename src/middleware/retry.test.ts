@@ -1,6 +1,6 @@
 import { Deferred } from 'ts-deferred'
 import { Announce } from '../Announce'
-import { Message, Subscriber } from '../types'
+import { Message } from '../types'
 import { createMessage, getCompleteMessage } from '../util'
 import * as delay from './delay'
 import { retry } from './retry'
@@ -111,32 +111,6 @@ describe('retry middleware', () => {
     expect(receivedMessages.length).toBe(1)
   })
 
-  it('Should not subscribe to the retry queues multiple times for equivalent subscribers', async () => {
-    const announce = new Announce({ url: 'memory://' })
-    const subscribers: Subscriber[] = []
-
-    announce.use(
-      spy({ onSubscribe: ({ subscriber }) => subscribers.push(subscriber) }),
-      retry()
-    )
-    const subscriber1: Subscriber = {
-      queueName: 'test',
-      topics: ['test'],
-      handle: doNothing,
-      options: {
-        concurrency: 1
-      }
-    }
-    const subscriber2 = { ...subscriber1, options: { concurrency: 2 } }
-
-    await announce.subscribe(subscriber1)
-
-    const originalSubscribers = [...subscribers]
-    await announce.subscribe(subscriber2)
-
-    expect(subscribers.length).toEqual(originalSubscribers.length + 1)
-  })
-
   it('Should set the current date when publishing messages to the delay queues', async () => {
     const messageDate = new Date()
     const receivedMessages: Message[] = []
@@ -211,7 +185,3 @@ describe('retry middleware', () => {
     expect(messagesPublished).toBe(1)
   })
 })
-
-function doNothing() {
-  // Do nothing
-}

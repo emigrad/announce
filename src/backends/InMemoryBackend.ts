@@ -1,7 +1,10 @@
 import assert from 'assert'
 import createDebug from 'debug'
 import { EventEmitter } from 'events'
-import { deadLetterQueue } from '../polyfills'
+import {
+  deadLetterQueue,
+  disallowMultipleQueueSubscriptions
+} from '../polyfills'
 import { Backend, BackendSubscriber, Message, Middleware } from '../types'
 import { getConcurrency, getTopicSelectorRegExp } from '../util'
 
@@ -62,7 +65,7 @@ export class InMemoryBackend extends EventEmitter implements Backend {
   }
 
   getPolyfills(): Middleware[] {
-    return [deadLetterQueue(this)]
+    return [disallowMultipleQueueSubscriptions(), deadLetterQueue(this)]
   }
 
   private getQueue(queueName: string): Queue

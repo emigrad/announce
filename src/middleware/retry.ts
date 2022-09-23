@@ -29,8 +29,6 @@ export const retry = ({
   canRetry = () => true
 }: RetryArgs = {}): Middleware => {
   return ({ addSubscribeMiddleware, publish }) => {
-    const initializedQueues: string[] = []
-
     addSubscribeMiddleware(async ({ subscriber, next }) => {
       await createRetryQueues(subscriber, next)
 
@@ -72,12 +70,8 @@ export const retry = ({
       subscriber: Subscriber,
       next: (subscriber: Subscriber) => Promise<unknown>
     ) {
-      if (!initializedQueues.includes(subscriber.queueName)) {
-        for (let retry = 1; retry <= maxRetries; retry++) {
-          await createRetryQueue(subscriber, retry, next)
-        }
-
-        initializedQueues.push(subscriber.queueName)
+      for (let retry = 1; retry <= maxRetries; retry++) {
+        await createRetryQueue(subscriber, retry, next)
       }
     }
 

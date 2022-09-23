@@ -20,6 +20,11 @@ config({ silent: true, purge_dotenv: true })
 const hash = createHash('md5').update(__filename).digest('hex').toString()
 const basePath = resolve(tmpdir(), hash)
 
+// Common tests that all backends must pass to ensure that they behave
+// the same. If you're writing a new backend and one or more of these tests
+// fails, a polyfill (in src/polyfills) might be available to implement
+// the necessary behaviour
+
 describe.each([
   ['InMemoryBackend', 'memory://'],
   ['FileBackend', `file://${basePath}`],
@@ -61,7 +66,10 @@ describe.each([
     await announce.subscribe(subscriber)
     await announce.publish(message)
 
-    expect(await dfd.promise).toMatchObject(message)
+    const receivedMessage = await dfd.promise
+
+    expect(receivedMessage).toMatchObject(message)
+    expect(receivedMessage.properties.date).toBeInstanceOf(Date)
   })
 
   it.each([
@@ -288,45 +296,33 @@ describe.each([
     }
   )
 
-  // Not implemented for InMemory and File
-  xit('Multiple consumers with the same name should all receive messages', async () => {
-    const dfds = [new Deferred(), new Deferred(), new Deferred()]
-    const subscribers = dfds.map((_, idx) => createSubscriber(idx))
-    const messagesReceivedBySubscriberId = subscribers.map(() => 0)
-    const messagesReceivedByMessageId: number[] = []
-    const done = Promise.all(dfds.map(({ promise }) => promise))
-
-    await Promise.all(
-      subscribers.map((subscriber) => announce.subscribe(subscriber))
-    )
-
-    for (let i = 0; i < subscribers.length; i++) {
-      messagesReceivedByMessageId[i] = 0
-      await announce.publish(
-        getCompleteMessage(createMessage('foo', Buffer.from(String(i))))
-      )
+  it('should not allow multiple subscriptions to the same queue', async () => {
+    const subscriber: Subscriber = {
+      queueName: 'test',
+      topics: ['test'],
+      handle: () => Promise.resolve()
     }
 
-    await done
+    await announce.subscribe(subscriber)
+    await expect(announce.subscribe(subscriber)).rejects.toBeInstanceOf(Error)
+  })
 
-    expect(messagesReceivedBySubscriberId.every((count) => count > 0))
-    expect(messagesReceivedByMessageId.every((count) => count <= 1))
-
-    function createSubscriber(subscriberId: number): BackendSubscriber {
-      return {
-        queueName: 'test',
-        topics: ['foo'],
-        handle({ body }) {
-          const messageId = +body.toString()
-          messagesReceivedByMessageId[messageId]++
-          messagesReceivedBySubscriberId[subscriberId]++
-          dfds[subscriberId].resolve()
-
-          return new Promise(() => {
-            // Never resolve
-          })
-        }
-      }
+  it('should allow resubscription after the queue has been destroyed', async () => {
+    const subscriber: Subscriber = {
+      queueName: 'test',
+      topics: ['test'],
+      handle: () => Promise.resolve()
     }
+
+    await announce.subscribe(subscriber)
+    await announce.destroyQueue(subscriber.queueName)
+    await announce.subscribe(subscriber)
+  })
+
+  it('publish() should still succeed even if there are no consumers', async () => {
+    const topic = String(Math.random())
+    const body = Buffer.from('')
+
+    await announce.publish(getCompleteMessage({ topic, body }))
   })
 })

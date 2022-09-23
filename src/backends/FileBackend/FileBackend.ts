@@ -15,7 +15,10 @@ import { prop, uniq } from 'rambda'
 import rimrafCb from 'rimraf'
 import { clearInterval } from 'timers'
 import { promisify } from 'util'
-import { deadLetterQueue } from '../../polyfills'
+import {
+  deadLetterQueue,
+  disallowMultipleQueueSubscriptions
+} from '../../polyfills'
 import { Backend, BackendSubscriber, Message, Middleware } from '../../types'
 import { getConcurrency } from '../../util'
 import {
@@ -181,7 +184,7 @@ export class FileBackend extends EventEmitter implements Backend {
   }
 
   getPolyfills(): Middleware[] {
-    return [deadLetterQueue(this)]
+    return [disallowMultipleQueueSubscriptions(), deadLetterQueue(this)]
   }
 
   private async initialize(): Promise<void> {

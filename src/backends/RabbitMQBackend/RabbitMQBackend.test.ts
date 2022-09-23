@@ -3,13 +3,13 @@ import { ConsumeMessage } from 'amqplib/properties'
 import assert from 'assert'
 import { config } from 'dotenv-flow'
 import { Deferred } from 'ts-deferred'
-import { BackendSubscriber, Message } from '../types'
+import { BackendSubscriber, Message } from '../../types'
 import {
   createMessage,
   getCompleteMessage,
   getDeadLetterQueueName,
   getHeader
-} from '../util'
+} from '../../util'
 import { RabbitMQBackend } from './RabbitMQBackend'
 
 config({ silent: true, purge_dotenv: true })
@@ -251,23 +251,6 @@ describe('RabbitMQ Backend', () => {
     await expect(
       rabbitMq.publish(getCompleteMessage({ topic, body }))
     ).rejects.toBeDefined()
-  })
-
-  it('Should emit error if queue deleted', async () => {
-    const dfd = new Deferred()
-    const subscriber: BackendSubscriber = {
-      queueName: queueName,
-      topics: ['test.*'],
-      async handle(message) {
-        dfd.resolve(message)
-      }
-    }
-
-    await rabbitMq.subscribe(subscriber)
-    rabbitMq.on('error', (error) => dfd.resolve(error))
-
-    await channel.deleteQueue(subscriber.queueName)
-    await dfd.promise
   })
 
   it('Should detect inability to connect', async () => {
