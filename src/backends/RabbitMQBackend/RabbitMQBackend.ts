@@ -4,7 +4,6 @@ import { MULTIPLE_SUBSCRIBERS_NOT_ALLOWED_MESSAGE } from '../../polyfills'
 import { Backend, BackendSubscriber, Message, Middleware } from '../../types'
 import { getHeader } from '../../util'
 import { Queue } from './Queue'
-import { convertBindingWildcards } from './util'
 
 const dateHeader = 'x-announce-date'
 
@@ -85,22 +84,6 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
 
     this.queuesByName[subscriber.queueName] = queue
     await queue.ready
-  }
-
-  async bindQueue(queueName: string, topics: readonly string[]): Promise<void> {
-    const publishChannel = await this.getPublishChannel()
-
-    // We don't use Queue because there may not be one defined for this queue
-    // name
-    await Promise.all(
-      topics.map((topic) =>
-        publishChannel.bindQueue(
-          queueName,
-          this.exchange,
-          convertBindingWildcards(topic)
-        )
-      )
-    )
   }
 
   async destroyQueue(queueName: string): Promise<void> {

@@ -16,12 +16,6 @@ export interface Backend extends Pick<EventEmitter, 'on'> {
   subscribe(subscriber: BackendSubscriber): Promise<void>
 
   /**
-   * Binds a queue to the given topics, causing that queue
-   * to receive any messages sent to those topics
-   */
-  bindQueue: (queueName: string, topics: readonly string[]) => Promise<unknown>
-
-  /**
    * Destroys the named queue, removing any unprocessed messages
    */
   destroyQueue: (queueName: string) => Promise<unknown>
@@ -71,4 +65,12 @@ export interface BackendSubscriber {
    * Any extra options
    */
   options?: SubscriberOptions
+}
+
+export interface CanBindQueue {
+  /**
+   * Binds a queue to the given topics, causing that queue
+   * to receive any messages sent to those topics
+   */
+  bindQueue: (queueName: string, topics: readonly string[]) => Promise<unknown>
 }

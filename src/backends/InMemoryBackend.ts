@@ -5,7 +5,13 @@ import {
   deadLetterQueue,
   disallowMultipleQueueSubscriptions
 } from '../polyfills'
-import { Backend, BackendSubscriber, Message, Middleware } from '../types'
+import {
+  Backend,
+  BackendSubscriber,
+  CanBindQueue,
+  Message,
+  Middleware
+} from '../types'
 import { getConcurrency, getTopicSelectorRegExp } from '../util'
 
 const debug = createDebug('announce:InMemory')
@@ -14,7 +20,10 @@ const debug = createDebug('announce:InMemory')
  * An in-memory backend for running tests etc. Not suitable for production
  * use as unprocessed messages are lost when the application shuts down
  */
-export class InMemoryBackend extends EventEmitter implements Backend {
+export class InMemoryBackend
+  extends EventEmitter
+  implements Backend, CanBindQueue
+{
   private readonly queuesByName: Record<string, Queue> = {}
 
   constructor() {

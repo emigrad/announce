@@ -1,5 +1,6 @@
 import {
   Backend,
+  CanBindQueue,
   HandleMiddlewareArgs,
   Message,
   Middleware,
@@ -14,7 +15,7 @@ const ORIGINAL_TOPIC_HEADER = 'x-dlq-original-topic'
  * Provides a dead letter queue capability for backends that don't have a
  * native one
  */
-export function deadLetterQueue(backend: Backend): Middleware {
+export function deadLetterQueue(backend: Backend & CanBindQueue): Middleware {
   return ({ addSubscribeMiddleware, addHandleMiddleware, publish }) => {
     addSubscribeMiddleware(subscribeMiddleware)
     addHandleMiddleware(handleMiddleware)

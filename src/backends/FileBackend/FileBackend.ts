@@ -19,7 +19,13 @@ import {
   deadLetterQueue,
   disallowMultipleQueueSubscriptions
 } from '../../polyfills'
-import { Backend, BackendSubscriber, Message, Middleware } from '../../types'
+import {
+  Backend,
+  BackendSubscriber,
+  CanBindQueue,
+  Message,
+  Middleware
+} from '../../types'
 import { getConcurrency } from '../../util'
 import {
   KEEPALIVE_INTERVAL,
@@ -63,7 +69,7 @@ const unlink = promisify(unlinkCb)
  *  - guaranteed delivery
  *  - dead letter queues
  */
-export class FileBackend extends EventEmitter implements Backend {
+export class FileBackend extends EventEmitter implements Backend, CanBindQueue {
   public readonly ready: Promise<void>
   private readonly queuesPath: string
   private readonly subscriptionsPath: string
