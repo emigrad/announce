@@ -16,7 +16,7 @@ import { convertBindingWildcards } from './util'
 const DATE_HEADER = 'x-announce-date'
 
 export class Queue extends EventEmitter {
-  private readonly channel: Promise<Channel>
+  private channel!: Promise<Channel>
   readonly ready: Promise<void>
 
   constructor(
@@ -26,8 +26,7 @@ export class Queue extends EventEmitter {
   ) {
     super()
 
-    this.channel = this.createChannel()
-    this.ready = this.setUpQueue()
+    this.ready = this.initialize()
 
     this.watchPromise(this.ready)
     this.on('error', () => this.close())
@@ -55,6 +54,20 @@ export class Queue extends EventEmitter {
     } catch {
       // It may already be closed
     }
+  }
+
+  private async initialize() {
+    if (this.channel) {
+      try {
+        const channel = await this.channel
+        await channel.close()
+      } catch {
+        // The channel might already be dead
+      }
+    }
+
+    this.channel = this.createChannel()
+    await this.setUpQueue()
   }
 
   private async createChannel(): Promise<Channel> {
@@ -107,7 +120,7 @@ export class Queue extends EventEmitter {
         // Notification that something interesting has happened on the
         // channel, eg a queue has been deleted. We don't know what
         // the event was, so all we can do is build a new channel
-        await this.setUpQueue()
+        await this.watchPromise(this.initialize())
       } else {
         let succeeded: boolean
 

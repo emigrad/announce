@@ -11,6 +11,7 @@ import {
   getHeader
 } from '../../util'
 import { RabbitMQBackend } from './RabbitMQBackend'
+import SpyInstance = jest.SpyInstance
 
 config({ silent: true, purge_dotenv: true })
 const url = process.env.RABBITMQ_URL ?? ''
@@ -36,7 +37,7 @@ describe('RabbitMQ Backend', () => {
     channel.on('error', squelch)
 
     await channel.deleteQueue(queueName)
-    rabbitMq = new RabbitMQBackend(url, { exchange })
+    rabbitMq = new RabbitMQBackend(`${url}/${exchange}`)
     rabbitMq.on('error', squelch)
   })
 
@@ -67,7 +68,7 @@ describe('RabbitMQ Backend', () => {
     })
 
     const dfd = new Deferred()
-    const backend = new RabbitMQBackend(url, { exchange })
+    const backend = new RabbitMQBackend(url)
     backend.on('error', (err) => dfd.resolve(err))
 
     expect(await dfd.promise).toMatchObject(expectedError)
@@ -400,92 +401,51 @@ describe('RabbitMQ Backend', () => {
 
   it('Should rebuild the channel when a null message is received', async () => {
     const topic = 'test'
-    const dfds = [new Deferred(), new Deferred(), new Deferred()]
+    const messageDeferred = new Deferred()
     const closedDfd = new Deferred()
+    const backendConnection = await rabbitMq['connection']
 
     // Force the backend to create the channel
-    await rabbitMq.subscribe(createSubscriber(0))
-    const subscribeChannel = await Object.values(
-      rabbitMq['subscriberChannels']
-    )[0]
+    const subscriber: BackendSubscriber = {
+      queueName: queueName,
+      topics: [topic],
+      handle: () => messageDeferred.resolve()
+    }
 
-    const consumeSpy = jest.spyOn(subscribeChannel, 'consume')
+    let consumeSpy!: SpyInstance
+    let subscribeChannelPromise!: PromiseLike<Channel>
+    const origCreateChannel = backendConnection.createChannel
+    jest
+      .spyOn(backendConnection, 'createChannel')
+      .mockImplementation(function (this: Connection) {
+        const promise = origCreateChannel.call(this).then((channel) => {
+          consumeSpy = jest.spyOn(channel, 'consume')
+
+          return channel
+        })
+        subscribeChannelPromise = promise as never
+
+        return promise
+      } as never)
+    await rabbitMq.subscribe(subscriber)
+
+    const subscribeChannel = await subscribeChannelPromise
     const origClose = subscribeChannel.close
-
     subscribeChannel.close = jest.fn(async () => {
       await origClose.call(subscribeChannel)
       closedDfd.resolve()
-    }) as unknown as Channel['close']
-    const closeSpy = jest.spyOn(subscribeChannel, 'close')
+    }) as never
 
-    // Add two more subscribers - we're going to send null messages to them both
-    await rabbitMq.subscribe(createSubscriber(1))
-    await rabbitMq.subscribe(createSubscriber(2))
-
-    const consumers = consumeSpy.mock.calls.map((call) => call[1])
-    consumers.forEach((consumer) => consumer(null))
+    const consumer = consumeSpy.mock.calls[0][1]
+    await consumer(null)
 
     await closedDfd.promise
-    expect(closeSpy).toHaveBeenCalledTimes(1)
 
     // Since the channel has been closed, we will only receive the messages
     // if it's rebuilt
     channel.publish(exchange, topic, Buffer.from(''))
-    await Promise.all(dfds.map(({ promise }) => promise))
 
-    // Messages can sometimes be received before the channel-creation promise
-    // is resolved, which can cause the test to complete before the backend
-    // has had a chance to complete its rebuild. We create a new subscriber
-    // to ensure that the rebuild completes and there aren't any errors thrown
-    await rabbitMq.subscribe(createSubscriber(4))
-
-    function createSubscriber(idx: number): BackendSubscriber {
-      return {
-        queueName: queueName + idx,
-        topics: [topic],
-        handle: () => dfds[idx].resolve()
-      }
-    }
-  })
-
-  it("Should not rebuild the channel when we're closing", async () => {
-    const topic = 'test'
-    const dfds = [new Deferred(), new Deferred(), new Deferred()]
-    const closedDfd = new Deferred()
-
-    // Force the backend to create the channel
-    await rabbitMq.subscribe(createSubscriber(0))
-    const subscribeChannel = await Object.values(
-      rabbitMq['subscriberChannels']
-    )[0]
-
-    const consumeSpy = jest.spyOn(subscribeChannel, 'consume')
-    const origClose = subscribeChannel.close
-
-    subscribeChannel.close = jest.fn(async () => {
-      await origClose.call(subscribeChannel)
-      closedDfd.resolve()
-    }) as unknown as Channel['close']
-    const closeSpy = jest.spyOn(subscribeChannel, 'close')
-
-    // Add two more subscribers - we're going to send null messages to them both
-    await rabbitMq.subscribe(createSubscriber(1))
-    await rabbitMq.subscribe(createSubscriber(2))
-
-    const consumers = consumeSpy.mock.calls.map((callArgs) => callArgs[1])
-    const closePromise = rabbitMq.close()
-    consumers.forEach((consumer) => consumer(null))
-
-    await closePromise
-    expect(closeSpy).not.toHaveBeenCalled()
-
-    function createSubscriber(idx: number): BackendSubscriber {
-      return {
-        queueName: queueName + idx,
-        topics: [topic],
-        handle: () => dfds[idx].resolve()
-      }
-    }
+    await messageDeferred.promise
   })
 
   it('Should reject the promise if a publish fails', async () => {
@@ -530,7 +490,7 @@ describe('RabbitMQ Backend', () => {
         rabbitMq.publish(
           getCompleteMessage({ topic: 'hi', body: Buffer.from('') })
         )
-      ).rejects.toContain('Oh no')
+      ).rejects.toBe(error)
     }
   )
 })

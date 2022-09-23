@@ -32,10 +32,12 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     super()
 
     this.url = new URL(url)
-    this.exchange = this.url.pathname.length ? this.url.pathname : 'events'
+    this.exchange = this.url.pathname.length
+      ? this.url.pathname.slice(1)
+      : 'events'
     this.connection = this.connect()
 
-    this.on('error', (error) => this.close(error.message ?? String(error)))
+    this.on('error', (error) => this.close(error))
     this.watchPromise(this.connection)
   }
 
@@ -93,7 +95,9 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     delete this.queuesByName[queueName]
   }
 
-  async close(reason = 'Connection has been closed'): Promise<void> {
+  async close(
+    reason: string | Error = 'Connection has been closed'
+  ): Promise<void> {
     if (!this.closePromise) {
       const connectionPromise = this.connection
 
@@ -126,10 +130,16 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
   }
 
   private async getPublishChannel(
-    connectionPromise: PromiseLike<Connection> = this.connection
+    connection?: Connection
   ): Promise<ConfirmChannel> {
+    if (!connection) {
+      // We need to await the main connection even if we already have a
+      // publish channel because if we've closed we will have replaced it
+      // with a rejected promise
+      connection = await this.connection
+    }
+
     if (!this.publishChannel) {
-      const connection = await connectionPromise
       this.publishChannel = connection.createConfirmChannel()
     }
 
@@ -142,12 +152,13 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
 
   private async connect(): Promise<Connection> {
     const amqplib = await getAmqpLib()
-    const connectionPromise = amqplib.connect(getServerUrl(this.url))
-    const channel = await this.getPublishChannel(connectionPromise)
+    const connection = await amqplib.connect(getServerUrl(this.url))
 
+    connection.on('error', (e) => this.emit('error', e))
+    const channel = await this.getPublishChannel(connection)
     await this.createExchange(channel)
 
-    return connectionPromise
+    return connection
   }
 
   private watchPromise(promise: Promise<unknown>) {
