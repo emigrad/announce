@@ -3,7 +3,7 @@ import createDebug from 'debug'
 import { EventEmitter } from 'events'
 import { deadLetterQueue } from '../polyfills'
 import { Backend, BackendSubscriber, Message, Middleware } from '../types'
-import { getConcurrency } from '../util'
+import { getConcurrency, getTopicSelectorRegExp } from '../util'
 
 const debug = createDebug('announce:InMemory')
 
@@ -13,6 +13,10 @@ const debug = createDebug('announce:InMemory')
  */
 export class InMemoryBackend extends EventEmitter implements Backend {
   private readonly queuesByName: Record<string, Queue> = {}
+
+  constructor() {
+    super()
+  }
 
   static accepts(url: string) {
     return url.startsWith('memory://')
@@ -45,10 +49,16 @@ export class InMemoryBackend extends EventEmitter implements Backend {
     queue.bindings = [...existingBindings, ...newBindings]
   }
 
+  async destroyQueue(queueName: string): Promise<void> {
+    delete this.queuesByName[queueName]
+  }
+
   async close() {
-    Object.keys(this.queuesByName).forEach((queueName) => {
-      delete this.queuesByName[queueName]
-    })
+    await Promise.all(
+      Object.keys(this.queuesByName).map((queueName) =>
+        this.destroyQueue(queueName)
+      )
+    )
   }
 
   getPolyfills(): Middleware[] {
@@ -107,14 +117,6 @@ export class InMemoryBackend extends EventEmitter implements Backend {
   private watchPromise(promise: Promise<unknown>) {
     promise.catch((e) => this.emit('error', e))
   }
-}
-
-function getTopicSelectorRegExp(topicSelector: string): RegExp {
-  const regExpStr = topicSelector
-    .replace(/\./g, '\\.')
-    .replace(/\*\*?/g, (match) => (match === '**' ? '.*' : '[^.]+'))
-
-  return new RegExp(`^${regExpStr}$`)
 }
 
 interface Queue {

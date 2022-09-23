@@ -6,6 +6,7 @@ import { join, resolve } from 'path'
 import { prop } from 'rambda'
 import { promisify } from 'util'
 import { Message } from '../../types'
+import { getTopicSelectorRegExp } from '../../util'
 import {
   PROCESSING_DIRECTORY,
   QUEUES_DIRECTORY,
@@ -207,14 +208,6 @@ function subscribesTo(
     subscriber.topics.some((topicSelector) =>
       getTopicSelectorRegExp(topicSelector).test(topic)
     )
-}
-
-function getTopicSelectorRegExp(topicSelector: string): RegExp {
-  const regExpStr = topicSelector
-    .replace(/\./g, '\\.')
-    .replace(/\*\*?/g, (match) => (match === '**' ? '.*' : '[^.]+'))
-
-  return new RegExp(`^${regExpStr}$`)
 }
 
 function randomString(): string {

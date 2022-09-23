@@ -4,6 +4,7 @@ import {
   Backend,
   BackendFactory,
   BackendSubscriber,
+  DestroyQueueMiddleware,
   Message,
   Middleware,
   PublishMiddleware,
@@ -26,6 +27,7 @@ export class Announce extends EventEmitter {
   private readonly backend: Backend
   private readonly subscribeMiddlewares: SubscribeMiddleware[] = []
   private readonly publishMiddlewares: PublishMiddleware[] = []
+  private readonly destroyQueueMiddlewares: DestroyQueueMiddleware[] = []
   private closePromise: Promise<void> | undefined
 
   constructor({
@@ -61,6 +63,7 @@ export class Announce extends EventEmitter {
    */
   use(...middlewares: Middleware[]): this {
     const publishMiddlewares = [...this.publishMiddlewares]
+    const destroyQueueMiddlewares = [...this.destroyQueueMiddlewares]
 
     middlewares.forEach((middlewareConstructor) => {
       let finished = false
@@ -96,6 +99,11 @@ export class Announce extends EventEmitter {
             )
           }
         },
+        addDestroyQueueMiddleware: (destroyQueueMiddleware) => {
+          if (!finished) {
+            this.destroyQueueMiddlewares.push(destroyQueueMiddleware)
+          }
+        },
         publish: <Body>(
           ...messages: UnpublishedMessage<Body>[]
         ): Promise<Message<Body>[]> => {
@@ -107,6 +115,9 @@ export class Announce extends EventEmitter {
               return completeMessage
             })
           )
+        },
+        destroyQueue: async (queueName) => {
+          await this._destroyQueue(queueName, destroyQueueMiddlewares)
         }
       })
 
@@ -154,6 +165,10 @@ export class Announce extends EventEmitter {
         return completeMessage
       })
     )
+  }
+
+  async destroyQueue(queueName: string): Promise<void> {
+    await this._destroyQueue(queueName, this.destroyQueueMiddlewares)
   }
 
   close() {
@@ -216,15 +231,41 @@ export class Announce extends EventEmitter {
       return this.backend.publish(message)
     }
   }
+
+  private async _destroyQueue(
+    queueName: string,
+    middlewares: readonly DestroyQueueMiddleware[]
+  ) {
+    const middleware = middlewares[middlewares.length - 1]
+    const remainingMiddlewares = middlewares.slice(0, middlewares.length - 1)
+
+    if (middleware) {
+      await middleware({
+        queueName,
+        next: (queueName) => this._destroyQueue(queueName, remainingMiddlewares)
+      })
+    } else {
+      return this.backend.destroyQueue(queueName)
+    }
+  }
 }
 
 function isValidTopic(topic: string) {
-  return /^[0-9A-Z_~]+(\.[0-9A-Z_~]+)*$/i.test(topic)
+  const words = topic.split('.')
+
+  return words.length >= 1 && words.every(isValidWord)
+}
+
+function isValidWord(word: string) {
+  return /^[0-9A-Z_~-]+$/i.test(word)
 }
 
 function isValidTopicSelector(topicSelector: string) {
-  return /^(\*|\*\*|[A-Z0-9_~]+)(\.(\*|\*\*|[A-Z0-9_~]+))*$/i.test(
-    topicSelector
+  const words = topicSelector.split('.')
+
+  return (
+    words.length >= 1 &&
+    words.every((word) => word === '*' || word === '**' || isValidWord(word))
   )
 }
 
@@ -236,9 +277,7 @@ function validateSubscriber(subscriber: Subscriber) {
     (topic) => !isValidTopicSelector(topic)
   )
   if (invalidTopics.length) {
-    throw new Error(
-      `Invalid topic selector(s): ${invalidTopics.join(', ')}. Topic `
-    )
+    throw new Error(`Invalid topic selector(s): ${invalidTopics.join(', ')}`)
   }
 }
 

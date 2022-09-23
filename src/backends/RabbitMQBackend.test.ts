@@ -56,31 +56,6 @@ describe('RabbitMQ Backend', () => {
     }
   )
 
-  it('Should be able to process messages', async () => {
-    const dfd = new Deferred()
-    const topic = 'test.test.test2'
-    const message = createMessage(
-      topic,
-      Buffer.from('hi there'),
-      { header1: 'Test' },
-      {
-        date: new Date('2020-01-02T18:19:20.123Z')
-      }
-    )
-    const subscriber: BackendSubscriber = {
-      queueName: queueName,
-      topics: ['test.*'],
-      async handle(message) {
-        dfd.resolve(message)
-      }
-    }
-
-    await rabbitMq.subscribe(subscriber)
-    await rabbitMq.publish(getCompleteMessage(message))
-
-    expect(await dfd.promise).toMatchObject(message)
-  })
-
   it("Should throw a helpful message if amqplib isn't available", async () => {
     const expectedError = {
       message: expect.stringContaining(

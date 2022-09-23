@@ -31,15 +31,20 @@ export interface MiddlewareArgs {
    * the message on to the next middleware in the chain, or the handler if this
    * is the innermost middleware. The returned promise should be resolved
    * once the message has been successfully processed.
-   *
-   * If both subscribe and handle are defined, handle is processed first,
-   * then provided as the handle() method in the subscriber passed to
-   * subscribe()
    */
   addHandleMiddleware: (handleMiddleware: HandleMiddleware) => void
 
   /**
-   * Publishes a message, bypassing any middleware that's added after this
+   * Called whenever a queue is destroyed. Calling next(queueName) passes
+   * the queue to the next middleware in the chain, or the backend if this
+   * is the innermost middleware.
+   */
+  addDestroyQueueMiddleware: (
+    destroyQueueMiddleware: DestroyQueueMiddleware
+  ) => void
+
+  /**
+   * Publishes a message, bypassing any middleware that was added after this
    * middleware
    *
    * @param messages The messages to publish
@@ -47,6 +52,14 @@ export interface MiddlewareArgs {
   publish: <Body>(
     ...messages: UnpublishedMessage<Body>[]
   ) => Promise<Message<Body>[]>
+
+  /**
+   * Destroys the given queue, bypassing any middleware that was added after
+   * this middleware
+   *
+   * @param queueName The name of the queue to destroy
+   */
+  destroyQueue: (queueName: string) => Promise<void>
 }
 
 export interface Middleware {
@@ -76,4 +89,12 @@ export interface HandleMiddlewareArgs {
   message: Message
   subscriber: Subscriber
   next: (message: Message) => Promise<unknown>
+}
+
+export interface DestroyQueueMiddleware {
+  (args: DestroyQueueMiddlewareArgs): Promise<unknown>
+}
+export interface DestroyQueueMiddlewareArgs {
+  queueName: string
+  next: (queueName: string) => Promise<unknown>
 }

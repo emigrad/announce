@@ -22,6 +22,11 @@ export interface Backend extends Pick<EventEmitter, 'on'> {
   bindQueue: (queueName: string, topics: readonly string[]) => Promise<unknown>
 
   /**
+   * Destroys the named queue, removing any unprocessed messages
+   */
+  destroyQueue: (queueName: string) => Promise<unknown>
+
+  /**
    * Closes the connection
    */
   close(): Promise<void>

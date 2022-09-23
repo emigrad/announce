@@ -104,9 +104,19 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
 
     await Promise.all(
       topics.map((topic) =>
-        channel.bindQueue(queueName, this.exchange, topic.replace(/\*/g, '#'))
+        channel.bindQueue(
+          queueName,
+          this.exchange,
+          convertBindingWildcards(topic)
+        )
       )
     )
+  }
+
+  async destroyQueue(queueName: string): Promise<void> {
+    const channel = await this.getPublishChannel()
+
+    await channel.deleteQueue(queueName)
   }
 
   async close(reason = 'Connection has been closed'): Promise<void> {
@@ -345,4 +355,8 @@ function convertMessage(amqpMessage: ConsumeMessage): Message<Buffer> {
   }
 
   return message
+}
+
+function convertBindingWildcards(topic: string): string {
+  return topic.replace(/\*\*/g, '#')
 }

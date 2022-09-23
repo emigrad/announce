@@ -11,7 +11,7 @@ describe('Announce', () => {
     delete process.env.ANNOUNCE_BACKEND_URL
   })
 
-  it.each(['***', ' hello', '..foo', '.bar', 'bar.', 'something-else'])(
+  it.each(['***', ' hello', '..foo', '.bar', 'bar.', 'something*else'])(
     'Should reject subscribers that listen to invalid topic %p',
     async (topic) => {
       const subscriber: Subscriber = {
@@ -25,7 +25,7 @@ describe('Announce', () => {
     }
   )
 
-  it.each(['***', ' hello', '..foo', '.bar', 'bar.', 'something-else'])(
+  it.each(['***', ' hello', '..foo', '.bar', 'bar.', 'something*else'])(
     'Should reject attempts to send messages to invalid topic %p',
     async (topic) => {
       const backend = new InMemoryBackend()

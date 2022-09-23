@@ -15,13 +15,7 @@ import rimrafCb from 'rimraf'
 import { Deferred } from 'ts-deferred'
 import { promisify } from 'util'
 import { BackendSubscriber, Message } from '../../types'
-import {
-  createMessage,
-  getCompleteMessage,
-  getConcurrency,
-  getDeadLetterQueueName,
-  getDeadLetterTopic
-} from '../../util'
+import { getCompleteMessage } from '../../util'
 import {
   PROCESSING_DIRECTORY,
   QUEUES_DIRECTORY,
@@ -64,105 +58,6 @@ describe('File backend', () => {
     await Promise.all(handles.map((handle) => handle()))
   })
 
-  it('Should publish and receive messages', async () => {
-    const dfd = new Deferred<Message<Buffer>>()
-    const subscriber: BackendSubscriber = {
-      queueName: 'test',
-      topics: ['foo.bar'],
-      handle: (message) => dfd.resolve(message)
-    }
-    const message = getCompleteMessage({
-      topic: 'foo.bar',
-      body: Buffer.from('hi there')
-    })
-
-    await fileBackend.subscribe(subscriber)
-    await fileBackend.publish(message)
-
-    const receivedMessage = await dfd.promise
-    expect(receivedMessage).toMatchObject(message)
-  })
-
-  it.each([
-    ['foo.*', 'foo.bar', true],
-    ['foo.*', 'foo', false],
-    ['foo.*', 'foo.bar.baz', false],
-    ['foo.*.baz', 'foo.bar.baz', true],
-    ['*.bar.baz', 'foo.bar.baz', true],
-    ['*.foo.baz', 'foo.bar.baz', false],
-    ['**', 'foo', true],
-    ['**', 'foo.bar', true],
-    ['**.baz', 'foo.bar', false],
-    ['**.baz', 'foo.baz.bar', false],
-    ['**.baz', 'foo.bar.baz', true],
-    ['foo.**', 'foo', false],
-    ['foo.**', 'foo.bar.baz', true]
-  ])(
-    'Should support wildcards in topic selectors (selector: %p, topic: %p)',
-    async (selector, topic, expected) => {
-      const delay = 200
-      const deferred = new Deferred<boolean>()
-      let receivedMessage = false
-      const subscriber: BackendSubscriber = {
-        queueName: 'test',
-        topics: [selector],
-        handle: () => {
-          receivedMessage = true
-          deferred.resolve(true)
-          clearTimeout(timeout)
-        }
-      }
-      const message = createMessage(topic, Buffer.from('hi there'))
-      const timeout = setTimeout(() => deferred.resolve(false), delay)
-
-      await fileBackend.subscribe(subscriber)
-      await fileBackend.publish(getCompleteMessage(message))
-
-      await deferred.promise
-
-      expect(receivedMessage).toBe(expected)
-    }
-  )
-
-  it('Should honour concurrency', async () => {
-    let numRunning = 0
-    let maxRunning = 0
-    const dfds = [
-      new Deferred(),
-      new Deferred(),
-      new Deferred(),
-      new Deferred(),
-      new Deferred(),
-      new Deferred()
-    ]
-    const done = Promise.all(dfds.map(({ promise }) => promise))
-
-    const subscriber: BackendSubscriber = {
-      queueName: 'test',
-      topics: ['foo'],
-      handle: async ({ body }) => {
-        numRunning++
-        maxRunning = Math.max(maxRunning, numRunning)
-
-        await new Promise((resolve) => setTimeout(resolve, 100))
-        numRunning--
-        dfds[+body.toString()].resolve()
-      },
-      options: { concurrency: 2 }
-    }
-    const message = createMessage('foo', null)
-    await fileBackend.subscribe(subscriber)
-
-    dfds.forEach((_, seq) =>
-      fileBackend.publish(
-        getCompleteMessage({ ...message, body: Buffer.from(String(seq)) })
-      )
-    )
-    await done
-
-    expect(maxRunning).toBe(getConcurrency(subscriber))
-  })
-
   it('Should not redeliver messages that were successfully processed', async () => {
     const dfd = new Deferred()
     let handleCount = 0
@@ -191,49 +86,6 @@ describe('File backend', () => {
 
     expect(handleCount).toBe(1)
   })
-
-  it.each([false, true])(
-    'Should send rejected messages to the dead letter queue (currently subscribed: %p)',
-    async (currentlySubscribed) => {
-      const subscriberDfd = new Deferred()
-      const dlqSubscriberDfd = new Deferred()
-      const subscriber: BackendSubscriber = {
-        queueName: 'test',
-        topics: ['foo.bar'],
-        handle: () => {
-          subscriberDfd.resolve()
-          return Promise.reject()
-        }
-      }
-      const dlqName = getDeadLetterQueueName(subscriber)
-      const dlqTopic = getDeadLetterTopic(subscriber)
-      assert(dlqName && dlqTopic)
-      const dlqSubscriber: BackendSubscriber = {
-        queueName: dlqName,
-        topics: [dlqTopic],
-        handle: () => dlqSubscriberDfd.resolve()
-      }
-      const message = getCompleteMessage({
-        topic: 'foo.bar',
-        body: Buffer.from('hi there')
-      })
-
-      await fileBackend.subscribe(subscriber)
-
-      if (currentlySubscribed) {
-        await fileBackend.subscribe(dlqSubscriber)
-      }
-
-      await fileBackend.publish(message)
-      await subscriberDfd.promise
-
-      if (!currentlySubscribed) {
-        await fileBackend.subscribe(dlqSubscriber)
-      }
-
-      await subscriberDfd.promise
-    }
-  )
 
   it('should handle rebinding queues', async () => {
     const emitter = new EventEmitter()
@@ -294,103 +146,6 @@ describe('File backend', () => {
     // subscription has changed, there may still be a message dispatched
     // to test1, but there should not be more than one message
     expect(messagesSeen.test1).not.toBeGreaterThan(1)
-  })
-
-  it('should handle queues being deleted', async () => {
-    const emitter = new EventEmitter()
-    const subscriber: BackendSubscriber = {
-      topics: ['foo.bar'],
-      queueName: 'test',
-      handle: () => {
-        emitter.emit('message')
-      },
-      options: { concurrency: 3 }
-    }
-    const message = getCompleteMessage({
-      topic: subscriber.topics[0],
-      body: Buffer.from('hello')
-    })
-    const fileBackend2 = new FileBackend(basePath)
-    handles.push(() => fileBackend2.close())
-    await fileBackend.subscribe(subscriber)
-    await fileBackend2.subscribe(subscriber)
-    const errors: unknown[] = []
-    // Spam both backends with messages
-    const messageSendInterval = setInterval(async () => {
-      await Promise.all([
-        fileBackend.publish(message),
-        fileBackend2.publish(message)
-      ])
-    }, 0)
-    let messageCount = 0
-    let mostRecentMessageTime = Infinity
-    emitter.on('message', () => (mostRecentMessageTime = Date.now()))
-    handles.push(() => clearInterval(messageSendInterval))
-    fileBackend.on('error', (error) => errors.push(error))
-    fileBackend2.on('error', (error) => errors.push(error))
-
-    // Wait for a few messages to start coming through
-    await new Promise<void>((resolve) => {
-      emitter.on('message', handler)
-
-      function handler() {
-        if (++messageCount > 10) {
-          emitter.removeListener('message', handler)
-          resolve()
-        }
-      }
-    })
-
-    // Delete the queue
-    await fileBackend.deleteQueue(subscriber.queueName)
-
-    // And wait for the messages to stop
-    await new Promise<void>((resolve) => {
-      const silenceTimer = setInterval(() => {
-        if (mostRecentMessageTime < Date.now() - 300) {
-          clearInterval(silenceTimer)
-          resolve()
-        }
-      })
-    })
-    expect(errors).toHaveLength(0)
-  })
-
-  it('should handle multiple messages with the same ID', async () => {
-    const message = getCompleteMessage({
-      topic: 'test',
-      body: Buffer.from('hi there')
-    })
-    const receivedMessages: Message<Buffer>[] = []
-    const receivedMessagesDeferred = new Deferred()
-    const subscriber: BackendSubscriber = {
-      queueName: 'test',
-      topics: ['test'],
-      handle: (receivedMessage) => {
-        receivedMessages.push(receivedMessage)
-
-        if (receivedMessages.length === 2) {
-          receivedMessagesDeferred.resolve(receivedMessages)
-        }
-      }
-    }
-    const fileBackend2 = new FileBackend(basePath)
-    await fileBackend2.subscribe(subscriber)
-    await fileBackend2.close()
-
-    // Have to use a new instance because we can't guarantee when fileBackend
-    // will receive notification that there's a new subscription
-    const fileBackend3 = new FileBackend(basePath)
-    handles.push(() => fileBackend3.close())
-    await fileBackend3.ready
-    await fileBackend3.publish(message)
-    await fileBackend3.publish(message)
-    await fileBackend3.subscribe(subscriber)
-
-    expect(await receivedMessagesDeferred.promise).toMatchObject([
-      message,
-      message
-    ])
   })
 
   it('should emit errors received from the watchdog', async () => {
@@ -561,8 +316,8 @@ describe('File backend', () => {
     await fileBackend['onMessageUnlinked']('non-existent-queue')
   })
 
-  it("should ignore attempts to delete queues that don't exist", async () => {
-    await fileBackend.deleteQueue('non-existent-queue')
+  it("should ignore attempts to destroy queues that don't exist", async () => {
+    await fileBackend.destroyQueue('non-existent-queue')
   })
 
   async function getFirstFile(path: string): Promise<string> {

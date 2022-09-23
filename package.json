@@ -40,6 +40,7 @@
     "chokidar": "^3.5.3",
     "cuid": "^2.1.8",
     "debug": "^4.3.4",
+    "escape-string-regexp": "^4.0.0",
     "promise-queue": "^2.2.5",
     "rambda": "^6.9.0",
     "rimraf": "^3.0.2",

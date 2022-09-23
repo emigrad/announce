@@ -72,9 +72,10 @@ export class FileBackend extends EventEmitter implements Backend {
     return url.startsWith('file://')
   }
 
-  constructor(basePath: string) {
+  constructor(url: string) {
     super()
 
+    const basePath = url.replace('file://', '')
     this.queuesPath = resolve(basePath, QUEUES_DIRECTORY)
     this.subscriptionsPath = resolve(basePath, SUBSCRIPTIONS_DIRECTORY)
     this.watchdog = new Watchdog()
@@ -133,7 +134,7 @@ export class FileBackend extends EventEmitter implements Backend {
     debug(`Published message ${message.properties.id}`)
   }
 
-  async deleteQueue(queueName: string): Promise<void> {
+  async destroyQueue(queueName: string): Promise<void> {
     const queue = this.queuesByName[queueName]
 
     if (queue) {
