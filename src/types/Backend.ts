@@ -30,6 +30,19 @@ export interface Backend extends Pick<EventEmitter, 'on'> {
    * the expected capabilities
    */
   getPolyfills(): Middleware[]
+
+  // The following methods are all optional
+
+  /**
+   * Binds a queue to the given topics, causing that queue
+   * to receive any messages sent to those topics
+   */
+  bindQueue?: (queueName: string, topics: readonly string[]) => Promise<unknown>
+
+  /**
+   * Returns true if the queue currently has an active subscriber
+   */
+  isSubscribed?: (queueName: string) => Promise<boolean>
 }
 
 export interface BackendConstructor {
@@ -65,12 +78,4 @@ export interface BackendSubscriber {
    * Any extra options
    */
   options?: SubscriberOptions
-}
-
-export interface CanBindQueue {
-  /**
-   * Binds a queue to the given topics, causing that queue
-   * to receive any messages sent to those topics
-   */
-  bindQueue: (queueName: string, topics: readonly string[]) => Promise<unknown>
 }

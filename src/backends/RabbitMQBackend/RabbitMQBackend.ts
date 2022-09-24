@@ -1,6 +1,6 @@
 import { Channel, ConfirmChannel, Connection } from 'amqplib'
 import { EventEmitter } from 'events'
-import { MULTIPLE_SUBSCRIBERS_NOT_ALLOWED_MESSAGE } from '../../polyfills'
+import { rejectMultipleSubscriptions } from '../../polyfills'
 import { Backend, BackendSubscriber, Message, Middleware } from '../../types'
 import { getHeader } from '../../util'
 import { Queue } from './Queue'
@@ -74,10 +74,6 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
   }
 
   async subscribe(subscriber: BackendSubscriber): Promise<void> {
-    if (this.queuesByName[subscriber.queueName]) {
-      throw new Error(MULTIPLE_SUBSCRIBERS_NOT_ALLOWED_MESSAGE)
-    }
-
     const connection = await this.connection
     const queue = new Queue(connection, this.exchange, subscriber)
     queue.on('error', () => {
@@ -86,6 +82,10 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
 
     this.queuesByName[subscriber.queueName] = queue
     await queue.ready
+  }
+
+  async isSubscribed(queueName: string): Promise<boolean> {
+    return queueName in this.queuesByName
   }
 
   async destroyQueue(queueName: string): Promise<void> {
@@ -126,7 +126,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
   }
 
   getPolyfills(): Middleware[] {
-    return []
+    return [rejectMultipleSubscriptions(this)]
   }
 
   private async getPublishChannel(

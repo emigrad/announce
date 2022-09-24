@@ -26,7 +26,7 @@ export class Queue extends EventEmitter {
   ) {
     super()
 
-    this.ready = this.initialize()
+    this.ready = this.initialize(false)
 
     this.watchPromise(this.ready)
     this.on('error', () => this.close())
@@ -56,7 +56,7 @@ export class Queue extends EventEmitter {
     }
   }
 
-  private async initialize() {
+  private async initialize(onlyIfQueueExists: boolean) {
     if (this.channel) {
       try {
         const channel = await this.channel
@@ -67,6 +67,12 @@ export class Queue extends EventEmitter {
     }
 
     this.channel = this.createChannel()
+
+    if (onlyIfQueueExists) {
+      // This will fail if the queue has been deleted
+      await this.bindTopics(this.subscriber.topics)
+    }
+
     await this.setUpQueue()
   }
 
@@ -120,7 +126,7 @@ export class Queue extends EventEmitter {
         // Notification that something interesting has happened on the
         // channel, eg a queue has been deleted. We don't know what
         // the event was, so all we can do is build a new channel
-        await this.watchPromise(this.initialize())
+        await this.watchPromise(this.initialize(true))
       } else {
         let succeeded: boolean
 

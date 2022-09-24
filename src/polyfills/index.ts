@@ -1,2 +1,2 @@
 export * from './deadLetterQueue'
-export * from './disallowMultipleQueueSubscriptions'
+export * from './rejectMultipleSubscriptions'

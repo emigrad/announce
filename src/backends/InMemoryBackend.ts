@@ -1,17 +1,8 @@
 import assert from 'assert'
 import createDebug from 'debug'
 import { EventEmitter } from 'events'
-import {
-  deadLetterQueue,
-  disallowMultipleQueueSubscriptions
-} from '../polyfills'
-import {
-  Backend,
-  BackendSubscriber,
-  CanBindQueue,
-  Message,
-  Middleware
-} from '../types'
+import { deadLetterQueue, rejectMultipleSubscriptions } from '../polyfills'
+import { Backend, BackendSubscriber, Message, Middleware } from '../types'
 import { getConcurrency, getTopicSelectorRegExp } from '../util'
 
 const debug = createDebug('announce:InMemory')
@@ -20,10 +11,7 @@ const debug = createDebug('announce:InMemory')
  * An in-memory backend for running tests etc. Not suitable for production
  * use as unprocessed messages are lost when the application shuts down
  */
-export class InMemoryBackend
-  extends EventEmitter
-  implements Backend, CanBindQueue
-{
+export class InMemoryBackend extends EventEmitter implements Backend {
   private readonly queuesByName: Record<string, Queue> = {}
 
   constructor() {
@@ -39,6 +27,10 @@ export class InMemoryBackend
     queue.subscriber = subscriber
 
     await this.bindQueue(subscriber.queueName, subscriber.topics)
+  }
+
+  async isSubscribed(queueName: string): Promise<boolean> {
+    return this.queuesByName[queueName]?.subscriber !== undefined
   }
 
   /**
@@ -74,7 +66,7 @@ export class InMemoryBackend
   }
 
   getPolyfills(): Middleware[] {
-    return [disallowMultipleQueueSubscriptions(), deadLetterQueue(this)]
+    return [rejectMultipleSubscriptions(this), deadLetterQueue(this)]
   }
 
   private getQueue(queueName: string): Queue

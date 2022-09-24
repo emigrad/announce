@@ -65,6 +65,10 @@ export class MessageRouter extends EventEmitter {
     )
   }
 
+  hasSubscriber(queueName: string): boolean {
+    return queueName in this.externalSubscribers
+  }
+
   async close(): Promise<void> {
     await this.subscriptionsWatcher.close()
     this.timers.forEach((timer) => clearTimeout(timer))

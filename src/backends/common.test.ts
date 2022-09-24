@@ -26,10 +26,10 @@ const basePath = resolve(tmpdir(), hash)
 // the necessary behaviour
 
 describe.each([
-  ['InMemoryBackend', 'memory://'],
-  ['FileBackend', `file://${basePath}`],
-  ['RabbitMQBackend', process.env.RABBITMQ_URL ?? '']
-])('Common backend tests: %s', (_, url) => {
+  ['InMemoryBackend', 'memory://', false],
+  ['FileBackend', `file://${basePath}`, true],
+  ['RabbitMQBackend', process.env.RABBITMQ_URL ?? '', true]
+])('Common backend tests: %s', (_, url, supportsPersistence) => {
   let announce: Announce
   let handles: (() => unknown)[]
 
@@ -325,4 +325,39 @@ describe.each([
 
     await announce.publish(getCompleteMessage({ topic, body }))
   })
+
+  if (supportsPersistence) {
+    it('should allow resubscription after the queue has been destroyed remotely', async () => {
+      const deferred = new Deferred()
+      const subscriber: Subscriber = {
+        queueName: 'test',
+        topics: ['test'],
+        handle: () => Promise.resolve()
+      }
+
+      await announce.subscribe(subscriber)
+
+      const announce2 = new Announce({ url })
+      await announce2.destroyQueue(subscriber.queueName)
+
+      const timeout = setTimeout(() => {
+        deferred.reject('Failed to resubscribe')
+      }, 200)
+      const interval = setInterval(async () => {
+        try {
+          await announce.subscribe(subscriber)
+          deferred.resolve()
+        } catch {
+          // Do nothing - try again shortly
+        }
+      }, 10)
+
+      handles.push(
+        () => clearInterval(interval),
+        () => clearTimeout(timeout)
+      )
+
+      await deferred.promise
+    })
+  }
 })
