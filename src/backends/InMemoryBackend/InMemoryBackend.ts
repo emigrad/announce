@@ -1,9 +1,9 @@
 import assert from 'assert'
 import createDebug from 'debug'
 import { EventEmitter } from 'events'
-import { deadLetterQueue, rejectMultipleSubscriptions } from '../polyfills'
-import { Backend, BackendSubscriber, Message, Middleware } from '../types'
-import { getConcurrency, getTopicSelectorRegExp } from '../util'
+import { deadLetterQueue, rejectMultipleSubscriptions } from '../../polyfills'
+import { Backend, BackendSubscriber, Message, Middleware } from '../../types'
+import { getConcurrency, getTopicSelectorRegExp } from '../../util'
 
 const debug = createDebug('announce:InMemory')
 

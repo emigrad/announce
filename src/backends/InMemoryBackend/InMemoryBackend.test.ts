@@ -1,5 +1,5 @@
 import { Deferred } from 'ts-deferred'
-import { getCompleteMessage } from '../util'
+import { getCompleteMessage } from '../../util'
 import { InMemoryBackend } from './InMemoryBackend'
 
 describe('InMemoryBackend', () => {
