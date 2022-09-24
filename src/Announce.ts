@@ -102,6 +102,10 @@ export class Announce extends EventEmitter {
         addDestroyQueueMiddleware: (destroyQueueMiddleware) => {
           if (!finished) {
             this.destroyQueueMiddlewares.push(destroyQueueMiddleware)
+          } else {
+            throw new Error(
+              "addDestroyQueueMiddleware() must be called from inside the middleware function, it can't be called after it has returned"
+            )
           }
         },
         publish: <Body>(

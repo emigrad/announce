@@ -168,9 +168,7 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
 
 function getServerUrl({ protocol, host, username, password }: URL): string {
   const hasCredentials = username.length || password.length
-  const credentials = hasCredentials
-    ? `${encodeURIComponent(username)}:${encodeURIComponent(password)}@`
-    : ''
+  const credentials = hasCredentials ? `${username}:${password}@` : ''
 
   return `${protocol}//${credentials}${host}`
 }

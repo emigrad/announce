@@ -1,6 +1,6 @@
 export const QUEUES_DIRECTORY = 'queues'
 export const SUBSCRIPTIONS_DIRECTORY = 'subscriptions'
-export const READY_DIRECTORY = 'ready'
+export const READY_DIRECTORY = 'queued'
 export const PROCESSING_DIRECTORY = 'processing'
 
 // How long to update the modtime on the processing file

@@ -17,6 +17,11 @@ export interface HandleDetails {
   subscriber: Subscriber
 }
 
+export interface DestroyQueueDetails {
+  announce: Announce
+  queueName: string
+}
+
 export interface SpyArgs {
   /**
    * Called whenever a message is about to be published
@@ -62,6 +67,23 @@ export interface SpyArgs {
    * Notification that a message was rejected by the handler
    */
   onHandleError?: (details: HandleDetails & { error: unknown }) => unknown
+
+  /**
+   * Called before a queue is destroyed
+   */
+  beforeDestroyQueue?: (details: DestroyQueueDetails) => unknown
+
+  /**
+   * Notification that a queue has been destroyed
+   */
+  onDestroyQueue?: (details: DestroyQueueDetails) => unknown
+
+  /**
+   * Notification that an attempt to destroy a queue failed
+   */
+  onDestroyQueueError?: (
+    details: DestroyQueueDetails & { error: unknown }
+  ) => unknown
 }
 
 /**
@@ -78,47 +100,63 @@ export function spy(listeners: SpyArgs): Middleware {
     onSubscribeError = doNothing,
     beforeHandle = doNothing,
     onHandle = doNothing,
-    onHandleError = doNothing
+    onHandleError = doNothing,
+    beforeDestroyQueue = doNothing,
+    onDestroyQueue = doNothing,
+    onDestroyQueueError = doNothing
   } = listeners
 
   return ({
     announce,
     addPublishMiddleware,
     addSubscribeMiddleware,
-    addHandleMiddleware
+    addHandleMiddleware,
+    addDestroyQueueMiddleware
   }) => {
     addPublishMiddleware(async ({ message, next }) => {
-      beforePublish({ message, announce })
+      await beforePublish({ message, announce })
 
       try {
         await next(message)
-        onPublish({ message, announce })
+        await onPublish({ message, announce })
       } catch (error) {
-        onPublishError({ error, message, announce })
+        await onPublishError({ error, message, announce })
         throw error
       }
     })
 
     addSubscribeMiddleware(async ({ subscriber, next }) => {
-      beforeSubscribe({ subscriber, announce })
+      await beforeSubscribe({ subscriber, announce })
 
       try {
         await next(subscriber)
-        onSubscribe({ subscriber, announce })
+        await onSubscribe({ subscriber, announce })
       } catch (error) {
-        onSubscribeError({ subscriber, error, announce })
+        await onSubscribeError({ subscriber, error, announce })
         throw error
       }
     })
 
     addHandleMiddleware(async ({ message, subscriber, next }) => {
-      beforeHandle({ message, subscriber, announce })
+      await beforeHandle({ message, subscriber, announce })
 
       try {
         await next(message)
-        onHandle({ message, subscriber, announce })
+        await onHandle({ message, subscriber, announce })
       } catch (error) {
-        onHandleError({ error, message, subscriber, announce })
+        await onHandleError({ error, message, subscriber, announce })
+        throw error
+      }
+    })
+
+    addDestroyQueueMiddleware(async ({ queueName, next }) => {
+      await beforeDestroyQueue({ queueName, announce })
+
+      try {
+        await next(queueName)
+        await onDestroyQueue({ queueName, announce })
+      } catch (error) {
+        await onDestroyQueueError({ queueName, announce, error })
         throw error
       }
     })

@@ -1,4 +1,4 @@
-import { Channel, connect, Connection } from 'amqplib'
+import { Channel, Connection, connect } from 'amqplib'
 import { ConsumeMessage } from 'amqplib/properties'
 import assert from 'assert'
 import { config } from 'dotenv-flow'
@@ -20,6 +20,7 @@ describe('RabbitMQ Backend', () => {
   let connection: Connection
   let channel: Channel
   let rabbitMq: RabbitMQBackend
+  let handles: (() => Promise<void>)[]
   const exchange = 'test'
   const queueName = 'test.mq-backend.queue'
 
@@ -28,6 +29,7 @@ describe('RabbitMQ Backend', () => {
   })
 
   beforeEach(async () => {
+    handles = []
     if (channel) {
       await channel.close().catch(squelch)
     }
@@ -42,6 +44,7 @@ describe('RabbitMQ Backend', () => {
   })
 
   afterEach(async () => {
+    await Promise.all(handles.map((handle) => handle()))
     await rabbitMq.close()
     jest.unmock('amqplib')
   })
@@ -493,6 +496,34 @@ describe('RabbitMQ Backend', () => {
       ).rejects.toBe(error)
     }
   )
+
+  it('should correctly send username/password', async () => {
+    // const connect = jest.fn().mockRejectedValue('blah')
+    let connectUrl!: string
+    jest.mock('amqplib', () => ({
+      connect(_connectUrl: string) {
+        connectUrl = _connectUrl
+        throw new Error('blah')
+      }
+    }))
+
+    const username = 'user with a space'
+    const password = 'letmein?'
+    const urlWithCredentials = url.replace(
+      '://',
+      `://${encodeURIComponent(username)}:${encodeURIComponent(password)}@`
+    )
+    const backend = new RabbitMQBackend(urlWithCredentials)
+
+    handles.push(() => backend.close())
+
+    await backend
+      .publish(getCompleteMessage({ topic: 'test', body: Buffer.from('') }))
+      .catch(() => {
+        // We're expecting it to fail
+      })
+    expect(connectUrl).toBe(urlWithCredentials)
+  })
 })
 
 function squelch() {

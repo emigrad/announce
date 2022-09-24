@@ -1,7 +1,6 @@
 import assert from 'assert'
 import { createHash } from 'crypto'
 import { config } from 'dotenv-flow'
-import { EventEmitter } from 'events'
 import { tmpdir } from 'os'
 import { resolve } from 'path'
 import { Deferred } from 'ts-deferred'
@@ -157,64 +156,6 @@ describe.each([
     await done
 
     expect(maxRunning).toBe(subscriber.options?.concurrency)
-  })
-
-  // InMemory and Rabbit both failing
-  xit('should handle queues being deleted', async () => {
-    const emitter = new EventEmitter()
-    const subscriber: BackendSubscriber = {
-      topics: ['foo.bar'],
-      queueName: 'test',
-      handle: () => {
-        emitter.emit('message')
-      },
-      options: { concurrency: 3 }
-    }
-    const message = getCompleteMessage({
-      topic: subscriber.topics[0],
-      body: Buffer.from('hello')
-    })
-    const announce2 = new Announce({ url })
-    handles.push(() => announce2.close())
-    await announce.subscribe(subscriber)
-    await announce2.subscribe(subscriber)
-    const errors: unknown[] = []
-    // Spam both backends with messages
-    const messageSendInterval = setInterval(async () => {
-      await Promise.all([announce.publish(message), announce2.publish(message)])
-    }, 0)
-    let messageCount = 0
-    let mostRecentMessageTime = Infinity
-    emitter.on('message', () => (mostRecentMessageTime = Date.now()))
-    handles.push(() => clearInterval(messageSendInterval))
-    announce.on('error', (error) => errors.push(error))
-    announce2.on('error', (error) => errors.push(error))
-
-    // Wait for a few messages to start coming through
-    await new Promise<void>((resolve) => {
-      emitter.on('message', handler)
-
-      function handler() {
-        if (++messageCount > 10) {
-          emitter.removeListener('message', handler)
-          resolve()
-        }
-      }
-    })
-
-    // Delete the queue
-    await announce.destroyQueue(subscriber.queueName)
-
-    // And wait for the messages to stop
-    await new Promise<void>((resolve) => {
-      const silenceTimer = setInterval(() => {
-        if (mostRecentMessageTime < Date.now() - 300) {
-          clearInterval(silenceTimer)
-          resolve()
-        }
-      })
-    })
-    expect(errors).toHaveLength(0)
   })
 
   it('should handle multiple messages with the same ID', async () => {

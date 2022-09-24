@@ -5,6 +5,7 @@ import {
   chmod as chmodCb,
   readdir as readdirCb,
   stat as statCb,
+  unlink as unlinkCb,
   utimes as utimesCb,
   writeFile as writeFileCb
 } from 'fs'
@@ -19,6 +20,7 @@ import { getCompleteMessage } from '../../util'
 import {
   PROCESSING_DIRECTORY,
   QUEUES_DIRECTORY,
+  READY_DIRECTORY,
   SUBSCRIPTIONS_DIRECTORY
 } from './constants'
 import { FileBackend } from './FileBackend'
@@ -30,6 +32,7 @@ const readdir = promisify(readdirCb)
 const rimraf = promisify(rimrafCb)
 const stat = promisify(statCb)
 const writeFile = promisify(writeFileCb)
+const unlink = promisify(unlinkCb)
 const utimes = promisify(utimesCb)
 
 const READ_ONLY = 0o500
@@ -318,6 +321,99 @@ describe('File backend', () => {
 
   it("should ignore attempts to destroy queues that don't exist", async () => {
     await fileBackend.destroyQueue('non-existent-queue')
+  })
+
+  it('should handle a pending message disappearing without notification', async () => {
+    await fileBackend.subscribe({
+      queueName: 'test',
+      topics: ['test'],
+      handle: () => Promise.resolve()
+    })
+    await fileBackend['lockAndProcessMessage'](
+      fileBackend['queuesByName'].test,
+      resolve(basePath, QUEUES_DIRECTORY, 'test', READY_DIRECTORY, 'blah.json')
+    )
+  })
+
+  it('should not emit an error if a handler fails', async () => {
+    let numSeenMessages = 0
+    let errorEmitted = false
+    const messagesDfd = new Deferred()
+    const message = getCompleteMessage({ topic: 'test', body: Buffer.from('') })
+
+    await fileBackend.subscribe({
+      queueName: 'test',
+      topics: ['test'],
+      handle() {
+        if (++numSeenMessages === 3) {
+          messagesDfd.resolve()
+        }
+
+        throw new Error()
+      }
+    })
+    fileBackend.on('error', () => {
+      errorEmitted = true
+    })
+
+    // If the failure of the first message hasn't handled properly, the
+    // subsequent messages will fail to be processed
+    await Promise.all([
+      fileBackend.publish(message),
+      fileBackend.publish(message),
+      fileBackend.publish(message)
+    ])
+
+    await messagesDfd.promise
+    expect(errorEmitted).toBe(false)
+  })
+
+  it('should handle a pending message being removed by an external process', async () => {
+    const neverResolve = new Deferred()
+    const processedAddedNotification = new Deferred()
+    const processedUnlinkedNotification = new Deferred()
+    const startedProcessingFirstMessage = new Deferred()
+    const message = { topic: 'test', body: Buffer.from('') }
+
+    let sawError = false
+    fileBackend.on('error', () => {
+      sawError = true
+    })
+
+    await fileBackend.subscribe({
+      queueName: message.topic,
+      topics: [message.topic],
+      handle: async () => {
+        startedProcessingFirstMessage.resolve()
+        await neverResolve.promise
+      }
+    })
+    await fileBackend.publish(getCompleteMessage(message))
+    await startedProcessingFirstMessage.promise
+
+    fileBackend['onMessageAdded'] = async function (path) {
+      await FileBackend.prototype['onMessageAdded'].call(this, path)
+      processedAddedNotification.resolve()
+    }
+
+    // This message will sit in the ready directory
+    await fileBackend.publish(getCompleteMessage(message))
+    await processedAddedNotification.promise
+
+    const messageFile = await getFirstFile(
+      resolve(basePath, QUEUES_DIRECTORY, message.topic, READY_DIRECTORY)
+    )
+    fileBackend['onMessageUnlinked'] = async function (path) {
+      await FileBackend.prototype['onMessageUnlinked'].call(this, path)
+
+      if (path === messageFile) {
+        processedUnlinkedNotification.resolve()
+      }
+    }
+    await unlink(messageFile)
+
+    await processedUnlinkedNotification.promise
+    expect(sawError).toBe(false)
   })
 
   async function getFirstFile(path: string): Promise<string> {

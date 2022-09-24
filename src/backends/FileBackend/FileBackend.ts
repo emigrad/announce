@@ -262,7 +262,7 @@ export class FileBackend extends EventEmitter implements Backend {
     if (
       !queue ||
       !queue.pendingMessages.length ||
-      queue.processingQueue.getQueueLength() >= getConcurrency(queue.subscriber)
+      getNumInFlightMessages(queue) >= getConcurrency(queue.subscriber)
     ) {
       return
     }
@@ -349,14 +349,14 @@ export class FileBackend extends EventEmitter implements Backend {
       return
     }
 
-    const unprocessedPaths = queue.pendingMessages
+    const pendingMessages = queue.pendingMessages
 
-    for (let idx = unprocessedPaths.length - 1; idx >= 0; idx--) {
-      if (unprocessedPaths[idx] === path) {
-        unprocessedPaths.splice(idx, 1)
+    for (let idx = pendingMessages.length - 1; idx >= 0; idx--) {
+      if (pendingMessages[idx] === path) {
+        pendingMessages.splice(idx, 1)
+        debug(`Message externally removed: ${path}`)
       }
     }
-    debug(`Message removed: ${path}`)
   }
 
   private watchPromise(promise: Promise<unknown>) {
@@ -374,6 +374,13 @@ function getProcessingPath(readyPath: string): string {
   pathParts[pathParts.length - 2] = PROCESSING_DIRECTORY
 
   return pathParts.join(sep)
+}
+
+function getNumInFlightMessages(queue: Queue): number {
+  return (
+    queue.processingQueue.getQueueLength() +
+    queue.processingQueue.getPendingLength()
+  )
 }
 
 interface Queue {

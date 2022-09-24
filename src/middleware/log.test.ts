@@ -95,6 +95,31 @@ describe('Logger middleware', () => {
       })
     )
   })
+
+  it.each([
+    [false, 'error'],
+    [true, 'info']
+  ])(
+    'Should log calls to destroyQueue (success: %p)',
+    async (succeeded, level) => {
+      const error = new Error()
+      backend.destroyQueue = async () => {
+        if (!succeeded) {
+          throw error
+        }
+      }
+
+      await announce.destroyQueue('test').catch(() => {
+        // Squelch
+      })
+
+      expect(logger[level as keyof Logger]).toHaveBeenCalledWith(
+        expect.objectContaining({
+          msg: expect.stringContaining('queue test')
+        })
+      )
+    }
+  )
 })
 
 interface Logger {

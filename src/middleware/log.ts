@@ -54,6 +54,8 @@ export type LoggableEvent =
   | 'subscribeError'
   | 'handleSuccess'
   | 'handleError'
+  | 'destroyQueueSuccess'
+  | 'destroyQueueError'
 
 export const DEFAULT_LOG_LEVELS = {
   publishSuccess: 'debug',
@@ -61,7 +63,9 @@ export const DEFAULT_LOG_LEVELS = {
   subscribeSuccess: 'info',
   subscribeError: 'error',
   handleSuccess: 'debug',
-  handleError: 'error'
+  handleError: 'error',
+  destroyQueueSuccess: 'info',
+  destroyQueueError: 'error'
 }
 
 export const log: <Logger>(args: LogArgs<Logger>) => Middleware = <Logger>({
@@ -132,6 +136,21 @@ export const log: <Logger>(args: LogArgs<Logger>) => Middleware = <Logger>({
         topic: message.topic,
         err: error,
         [messageKey]: `Error handling message for ${subscriber.queueName}: ${error}`
+      })
+    },
+
+    onDestroyQueue({ queueName }) {
+      typedLogger[fullLogLevels.destroyQueueSuccess]({
+        queueName,
+        [messageKey]: `Destroyed queue ${queueName}`
+      })
+    },
+
+    onDestroyQueueError({ queueName, error }) {
+      typedLogger[fullLogLevels.destroyQueueError]({
+        queueName,
+        err: error,
+        [messageKey]: `Failed to destroy queue ${queueName}: ${error}`
       })
     }
   })

@@ -3,7 +3,7 @@ import { Deferred } from 'ts-deferred'
 import { Announce } from './Announce'
 import { InMemoryBackend } from './backends'
 import { createMessage, getCompleteMessage } from './util'
-import { json, log } from './middleware'
+import { json, log, spy } from './middleware'
 import { Message, MiddlewareArgs, Subscriber } from './types'
 
 describe('Announce', () => {
@@ -262,6 +262,25 @@ describe('Announce', () => {
     expect(() => args.addHandleMiddleware(doNothing)).toThrowError(
       "addHandleMiddleware() must be called from inside the middleware function, it can't be called after it has returned"
     )
+    expect(() => args.addDestroyQueueMiddleware(doNothing)).toThrowError(
+      "addDestroyQueueMiddleware() must be called from inside the middleware function, it can't be called after it has returned"
+    )
+  })
+
+  it('middleware calls to destroyQueue() should skip all later middleware', async () => {
+    const announce = new Announce({ url: 'memory://' })
+    const onDestroyQueue = jest.fn()
+    let innerDestroyQueue!: (queueName: string) => Promise<void>
+
+    jest.spyOn(announce['backend'], 'destroyQueue')
+    announce.use(({ destroyQueue }) => {
+      innerDestroyQueue = destroyQueue
+    }, spy({ onDestroyQueue }))
+
+    await innerDestroyQueue('test')
+
+    expect(announce['backend'].destroyQueue).toHaveBeenCalledWith('test')
+    expect(onDestroyQueue).not.toHaveBeenCalled()
   })
 })
 
