@@ -125,6 +125,7 @@ export const log: <Logger>(args: LogArgs<Logger>) => Middleware = <Logger>({
         messageId: message.properties.id,
         duration: getDuration(message),
         topic: message.topic,
+        queueName: subscriber.queueName,
         [messageKey]: `Handled message for ${subscriber.queueName}`
       })
     },
@@ -134,6 +135,7 @@ export const log: <Logger>(args: LogArgs<Logger>) => Middleware = <Logger>({
         messageId: message.properties.id,
         duration: getDuration(message),
         topic: message.topic,
+        queueName: subscriber.queueName,
         err: error,
         [messageKey]: `Error handling message for ${subscriber.queueName}: ${error}`
       })
