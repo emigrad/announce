@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.7.0](https://github.com/emigrad/announce/compare/v0.6.1...v0.7.0) (2022-10-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* backends now reject attempts to add multiple subscribers to the smae queue
+
+### Features
+
+* err parameter to destroy() is now optional ([ad7d7ac](https://github.com/emigrad/announce/commit/ad7d7acf46ed496d5dde931abd7acd8b59585966))
+* **FileBackend:** support multiple processes ([40ffa76](https://github.com/emigrad/announce/commit/40ffa767a8f6315006834b82b5a0c4f66fdf6fa4))
+
+
+### Bug Fixes
+
+* batch now removes any pending timeouts when Announce.close() is called ([12902c7](https://github.com/emigrad/announce/commit/12902c702166ba1542d5506cd95bd350b83bd193))
+
+
+* ensure backends support re-adding deleted subscribers ([152e62b](https://github.com/emigrad/announce/commit/152e62b6175aa721629b9847563311d05896d887))
+
 ### [0.6.1](https://github.com/emigrad/announce/compare/v0.6.0...v0.6.1) (2022-09-17)
 
 
