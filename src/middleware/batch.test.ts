@@ -85,6 +85,14 @@ describe('batch', () => {
     }
   })
 
+  it('should shut down cleanly when the announce instance is closed', async () => {
+    await announce.publish(createMessage('test', Buffer.from('1234')))
+    await announce.close()
+
+    jest.advanceTimersByTime(maxTime)
+    expect(receivedBatches).toHaveLength(0)
+  })
+
   it('should reject all messages in the batch if processing fails', async () => {
     const error = new Error('Oh no')
     await announce.subscribe({

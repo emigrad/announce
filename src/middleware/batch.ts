@@ -19,6 +19,13 @@ export interface BatchArgs {
 export const batch: (args: BatchArgs) => Middleware =
   ({ maxTime, maxMessages }) =>
   ({ announce, addSubscribeMiddleware }) => {
+    const timeouts = new Set<NodeJS.Timeout>()
+    announce.on('close', () => {
+      for (const timeout of timeouts.values()) {
+        clearTimeout(timeout)
+      }
+    })
+
     addSubscribeMiddleware(async ({ subscriber, next }) => {
       const concurrency = subscriber.options?.concurrency ?? 1
       // We use a promise queue to ensure we never exceed the handler's
@@ -48,6 +55,7 @@ export const batch: (args: BatchArgs) => Middleware =
             timeout: setTimeout(processBatch, maxTime),
             messages: []
           }
+          timeouts.add(batch.timeout)
         }
 
         const promise = batch.deferred.promise
@@ -65,6 +73,7 @@ export const batch: (args: BatchArgs) => Middleware =
         const { timeout, messages, deferred } = batch
         batch = undefined
 
+        timeouts.delete(timeout)
         clearTimeout(timeout)
 
         promiseQueue
