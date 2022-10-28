@@ -190,8 +190,14 @@ export class Announce extends EventEmitter {
     return this.closePromise
   }
 
-  destroy(err: unknown) {
-    this.emit('error', err)
+  /**
+   * Closes the Announce instance, optionally emitting the given error
+   */
+  destroy(err?: unknown) {
+    if (err) {
+      this.emit('error', err)
+    }
+
     return this.close()
   }
 

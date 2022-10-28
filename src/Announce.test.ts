@@ -235,6 +235,7 @@ describe('Announce', () => {
     const announce = new Announce({ url: 'memory://' })
 
     expect(announce.close()).toBe(announce.close())
+    expect(announce.destroy()).toBe(announce.close())
   })
 
   it('Should correctly handle subscribers that are class instances', async () => {
