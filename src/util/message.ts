@@ -1,10 +1,10 @@
-import cuid from 'cuid'
+import { createId } from '@paralleldrive/cuid2'
 import {
+  BackendSubscriber,
   Message,
   MessageProperties,
-  UnpublishedMessage,
   Subscriber,
-  BackendSubscriber
+  UnpublishedMessage
 } from '../types'
 
 /**
@@ -40,7 +40,7 @@ export function getCompleteProperties(
   properties?: Partial<MessageProperties>
 ): MessageProperties {
   return {
-    id: cuid(),
+    id: createId(),
     date: new Date(),
     ...properties
   }

@@ -1,7 +1,7 @@
+import { createId } from '@paralleldrive/cuid2'
 import { Channel, Connection, MessageProperties } from 'amqplib'
 import { ConsumeMessage, Options } from 'amqplib/properties'
 import assert from 'assert'
-import cuid from 'cuid'
 import { EventEmitter } from 'events'
 import { BackendSubscriber, Message } from '../../types'
 import {
@@ -161,7 +161,7 @@ function convertMessage(amqpMessage: ConsumeMessage): Message<Buffer> {
     topic: amqpMessage.fields.routingKey,
     headers: amqpMessage.properties.headers as Record<string, string>,
     properties: {
-      id: amqpMessage.properties.messageId ?? cuid(),
+      id: amqpMessage.properties.messageId ?? createId(),
       date: getMessageDate(amqpMessage.properties)
     },
     body: amqpMessage.content

@@ -36,9 +36,9 @@
     "release": "standard-version"
   },
   "dependencies": {
+    "@paralleldrive/cuid2": "^2.2.0",
     "@types/promise-queue": "^2.2.0",
     "chokidar": "^3.5.3",
-    "cuid": "^2.1.8",
     "debug": "^4.3.4",
     "escape-string-regexp": "^4.0.0",
     "promise-queue": "^2.2.5",
