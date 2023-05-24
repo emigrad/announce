@@ -5,7 +5,9 @@ import { Message, Middleware, Subscriber } from '../types'
 import { createMessage, getCompleteMessage } from '../util'
 
 export interface BatchArgs {
-  /** The maximum amount of time to wait before processing a batch */
+  /** The maximum amount of time to wait before processing a batch,
+   * in milliseconds
+   */
   maxTime: number
   /** The maximum number of messages a batch can contain */
   maxMessages: number
