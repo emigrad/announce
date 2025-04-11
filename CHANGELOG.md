@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.2](https://github.com/emigrad/announce/compare/v0.7.1...v0.7.2) (2025-04-11)
+
+
+### Features
+
+* add ability to filter subscriptions ([136e172](https://github.com/emigrad/announce/commit/136e172c7beca96fd9db9abfbcf4e2e83e27b8e2))
+* log message latency ([022432e](https://github.com/emigrad/announce/commit/022432e662c0d62d71bc131538ae3279eb73c463))
+
 ### [0.7.1](https://github.com/emigrad/announce/compare/v0.7.0...v0.7.1) (2023-05-24)
 
 ### Miscellaneous
