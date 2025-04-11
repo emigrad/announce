@@ -311,6 +311,14 @@ Source: [retry.ts](./src/middleware/retry.ts)
 
 Source: [spy.ts](./src/middleware/spy.ts)
 
+## subscriptionFilter()
+
+### Options
+
+- `filter`: The filter to apply. Subscriptions that don't match the filter will be ignored. Can be a string (exact match on queueName), RegExp (tests on queueName), or a function that accepts the subscriber as its only argument.
+
+Source: [subscriptionFilter.ts](./src/middleware/subscriptionFilter.ts)
+
 # Writing middleware
 
 See spy() example in retry.test.js
