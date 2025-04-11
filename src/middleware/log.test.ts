@@ -11,6 +11,8 @@ describe('Logger middleware', () => {
   let backend: InMemoryBackend
 
   beforeEach(() => {
+    jest.useRealTimers()
+
     logger = {
       debug: jest.fn(),
       info: jest.fn(),
@@ -70,11 +72,17 @@ describe('Logger middleware', () => {
     [false, 'error'],
     [true, 'info']
   ])('Should log messages (success: %p)', async (succeeded, level) => {
+    jest.useFakeTimers()
+    const latency = 567
+    const duration = 123
+
     const error = new Error()
     const subscriber = {
       queueName: 'abc',
       topics: ['abc'],
       handle: () => {
+        jest.advanceTimersByTime(duration)
+
         if (!succeeded) {
           throw error
         }
@@ -83,7 +91,7 @@ describe('Logger middleware', () => {
     const message = getCompleteMessage({
       topic: 'abc',
       body: null,
-      properties: { id: '33' }
+      properties: { id: '33', date: new Date(Date.now() - latency) }
     })
 
     await announce.subscribe(subscriber)
@@ -91,7 +99,9 @@ describe('Logger middleware', () => {
 
     expect(logger[level as keyof Logger]).toHaveBeenCalledWith(
       expect.objectContaining({
-        msg: expect.stringContaining('message for abc')
+        msg: expect.stringContaining('message for abc'),
+        latency,
+        duration
       })
     )
   })

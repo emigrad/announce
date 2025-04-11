@@ -123,6 +123,7 @@ export const log: <Logger>(args: LogArgs<Logger>) => Middleware = <Logger>({
     onHandle({ message, subscriber }) {
       typedLogger[fullLogLevels.handleSuccess]({
         messageId: message.properties.id,
+        latency: getLatency(message),
         duration: getDuration(message),
         topic: message.topic,
         queueName: subscriber.queueName,
@@ -133,6 +134,7 @@ export const log: <Logger>(args: LogArgs<Logger>) => Middleware = <Logger>({
     onHandleError({ error, message, subscriber }) {
       typedLogger[fullLogLevels.handleError]({
         messageId: message.properties.id,
+        latency: getLatency(message),
         duration: getDuration(message),
         topic: message.topic,
         queueName: subscriber.queueName,
@@ -159,5 +161,13 @@ export const log: <Logger>(args: LogArgs<Logger>) => Middleware = <Logger>({
 }
 
 function getDuration(message: Message): number {
-  return Date.now() - +new Date(message.headers[START_HEADER])
+  return Date.now() - Number(new Date(message.headers[START_HEADER]))
+}
+
+function getLatency(message: Message): number {
+  return Math.max(
+    0,
+    Number(new Date(message.headers[START_HEADER])) -
+      Number(message.properties.date)
+  )
 }
