@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.3](https://github.com/emigrad/announce/compare/v0.7.2...v0.7.3) (2025-10-24)
+
+
+### Bug Fixes
+
+* emit error when Rabbit connection unexpectedly closes ([bc13d2b](https://github.com/emigrad/announce/commit/bc13d2bd2dbe7ac3594b704409e9fba832c18bf1))
+
 ### [0.7.2](https://github.com/emigrad/announce/compare/v0.7.1...v0.7.2) (2025-04-11)
 
 
