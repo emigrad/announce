@@ -3,7 +3,9 @@ import { createHash } from 'crypto'
 import { config } from 'dotenv-flow'
 import { tmpdir } from 'os'
 import { resolve } from 'path'
+import rimrafCb from 'rimraf'
 import { Deferred } from 'ts-deferred'
+import { promisify } from 'util'
 import { Announce } from '../Announce'
 import { BackendSubscriber, Message, Subscriber } from '../types'
 import {
@@ -13,6 +15,8 @@ import {
   getDeadLetterQueueName,
   getDeadLetterTopic
 } from '../util'
+
+const rimraf = promisify(rimrafCb)
 
 config({ silent: true, purge_dotenv: true })
 
@@ -33,6 +37,7 @@ describe.each([
   let handles: (() => unknown)[]
 
   beforeEach(async () => {
+    await rimraf(basePath)
     announce = new Announce({ url })
     handles = []
 
