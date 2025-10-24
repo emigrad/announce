@@ -155,6 +155,12 @@ export class RabbitMQBackend extends EventEmitter implements Backend {
     const connection = await amqplib.connect(getServerUrl(this.url))
 
     connection.on('error', (e) => this.emit('error', e))
+    connection.on('close', () => {
+      if (!this.closePromise) {
+        this.emit('error', new Error('Connection closed'))
+      }
+    })
+
     const channel = await this.getPublishChannel(connection)
     await this.createExchange(channel)
 

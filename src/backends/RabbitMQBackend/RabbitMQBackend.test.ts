@@ -294,6 +294,34 @@ describe('RabbitMQ Backend', () => {
     expect(await dfd.promise).toBe(error)
   })
 
+  it('Should detect connection closing', async () => {
+    const dfd = new Deferred()
+    const error = new Error('Connection closed')
+
+    rabbitMq.on('error', (err) => dfd.resolve(err))
+    await rabbitMq.publish(
+      getCompleteMessage({
+        topic: String(Math.random()),
+        body: Buffer.from('')
+      })
+    )
+
+    const connection = await rabbitMq['connection']
+    await connection.close()
+
+    expect(await dfd.promise).toEqual(error)
+  })
+
+  it('should not emit an error when close() is called', async () => {
+    let error: unknown = undefined
+    rabbitMq.on('error', (err) => (error = err))
+
+    await rabbitMq.close()
+
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    expect(error).toBe(undefined)
+  })
+
   it("Should generate a message ID if it's missing", async () => {
     const dfd = new Deferred<Message<Buffer>>()
     await rabbitMq.subscribe({
