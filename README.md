@@ -104,7 +104,78 @@ If you're only planning to run a single instance of your application (for exampl
 
 # Use cases
 
-Publish/subscribe
+Here are some common use cases for the publish/subscribe pattern. Many of these can be combined for powerful results.
+
+## Emails and push notifications
+
+When something happens in your application (a comment is added, a user signs up, an order is placed), publish an event and let a separate subscriber handle sending the email or push notification. This keeps your business logic clean and makes it easy to change what notifications are sent without modifying the original code.
+
+```typescript
+// In your comment service
+await announce.publish({ topic: 'comment.created', body: { postId, commentId, authorId } })
+
+// In a separate notification module
+await announce.subscribe({
+  queueName: 'comment-email-notifications',
+  topics: ['comment.created'],
+  async handle(message) {
+    const post = await getPost(message.body.postId)
+    await sendEmail(post.authorEmail, 'New comment on your post', ...)
+  }
+})
+```
+
+It is a good practice to send one message per email, so that users don't receive duplicate emails due to unrelated failures in other message handlers.
+
+## Batch processing
+
+Use the `batch()` middleware to group messages together before processing them. This is ideal for situations where it's more efficient to process items in bulk, such as database writes, API calls, or report generation.
+
+## Job systems
+
+Announce can be used as a simple job processing system. Publish a message describing the job, and a subscriber picks it up and processes it. With the `retry()` middleware, failed jobs are automatically retried. With multiple application instances connected to RabbitMQ, jobs are automatically distributed across workers.
+
+## Cache invalidation
+
+### Direct invalidation
+
+Publish an event when data changes and subscribe to it in your caching layer to invalidate the affected cache entries directly.
+
+```typescript
+await announce.subscribe({
+  queueName: 'user-cache-invalidation',
+  topics: ['user.*'],
+  async handle(message) {
+    await cache.delete(`user:${message.body.userId}`)
+  }
+})
+```
+
+### Indirect invalidation
+
+When the data you need to invalidate depends on other data, listen for those upstream changes. For example, if a user's display name changes, invalidate the cache for all posts authored by that user.
+
+## Webhooks
+
+### Receiving events
+
+When your application receives a webhook from an external service, publish it as a message. This decouples your webhook endpoint from the code that processes the event, and gives you the benefits of retries and dead letter queues.
+
+### Sending events
+
+Subscribe to internal events and forward them as webhooks to external services.
+
+## Perform an action after things _stop_ happening
+
+Use the `delay()` middleware to wait before acting on an event. If another event arrives before the delay expires, the timer resets. This is useful for sending a summary email after a burst of activity, or debouncing rapid changes.
+
+## Live query updates
+
+Publish events when data changes and subscribe to them on behalf of connected clients to push real-time updates via WebSockets or Server-Sent Events.
+
+## Soft start
+
+Use the `subscriptionFilter()` middleware when starting your application to control which subscribers are active. This allows you to gradually enable functionality, or to run specialised instances that only process certain types of work.
 
 # Concepts
 
@@ -188,7 +259,116 @@ Doing this means that the rejected messages will not be preserved.
 
 # API
 
+## `new Announce(args?)`
+
+Creates a new Announce instance.
+
+- `args.url` (optional): The backend URL. If not provided, the `ANNOUNCE_BACKEND_URL` environment variable is used. Supported schemes: `memory://`, `file://`, `amqp://`, `amqps://`.
+- `args.backendFactory` (optional): A custom factory function for creating backends. This is primarily useful for testing.
+
+```typescript
+// Use the ANNOUNCE_BACKEND_URL environment variable
+const announce = new Announce()
+
+// Or provide a URL directly
+const announce = new Announce({ url: 'memory://' })
+```
+
+## `announce.use(...middlewares)`
+
+Adds one or more middlewares to the instance. Middlewares are applied to all subsequent `subscribe()`, `publish()` and `destroyQueue()` calls. Returns the instance for chaining.
+
+```typescript
+announce.use(json(), log({ logger }), retry())
+```
+
+## `announce.with(...middlewares)`
+
+Returns a copy of the Announce instance with the given middlewares added. The original instance is not modified. Use this when you want middleware to apply only to certain subscribers or publish calls.
+
+```typescript
+const delayedAnnounce = announce.with(delay({ delay: 5000 }))
+await delayedAnnounce.subscribe(mySubscriber) // only this subscriber is delayed
+```
+
+## `announce.subscribe(...subscribers)`
+
+Adds one or more subscribers. Each subscriber must have:
+
+- `queueName` (string): A globally unique name for this subscriber's queue.
+- `topics` (string[]): The topic patterns to listen to. Supports `*` (matches one level) and `**` (matches zero or more levels).
+- `handle(message, { announce })` (function): The function that processes each message. Throw an error to reject the message.
+- `options.concurrency` (number, optional): How many messages can be processed simultaneously. Default: `1`.
+- `options.preserveRejectedMessages` (boolean, optional): Whether to preserve rejected messages in a dead letter queue. Default: `true`.
+
+```typescript
+await announce.subscribe({
+  queueName: 'send-welcome-emails',
+  topics: ['user.created'],
+  async handle(message, { announce }) {
+    await sendWelcomeEmail(message.body.email)
+  }
+})
+```
+
+## `announce.publish(...messages)`
+
+Publishes one or more messages. Returns a promise that resolves with an array of the completed messages (with `id` and `date` filled in).
+
+Each message must have:
+
+- `topic` (string): The message's topic, as a dotted string (eg `user.created`).
+- `body` (any): The message payload. Must be a `Buffer` unless the `json()` middleware is used.
+- `headers` (object, optional): Application-specific headers.
+- `properties` (object, optional): Message metadata. `id` and `date` are auto-generated if not provided.
+
+```typescript
+const [message] = await announce.publish({
+  topic: 'user.created',
+  body: { id: 123, email: 'user@example.com' }
+})
+
+console.log(message.properties.id)   // auto-generated unique ID
+console.log(message.properties.date) // auto-generated Date
+```
+
+## `announce.destroyQueue(queueName)`
+
+Destroys the named queue, removing any unprocessed messages.
+
+## `announce.close()`
+
+Closes the Announce instance and its connection to the backend. Returns a promise that resolves when the connection is closed. Emits a `'close'` event.
+
+## `announce.destroy(err?)`
+
+Closes the Announce instance, optionally emitting the given error before closing.
+
 # Error handling
+
+Announce handles errors at several levels:
+
+## Handler errors
+
+When a subscriber's `handle()` function throws an error, the message is _rejected_. By default, rejected messages are republished to a dead letter queue (see [Dead letter queues and topics](#dead-letter-queues-and-topics)). You can use the `retry()` middleware to automatically retry failed messages before they are rejected.
+
+## Publish errors
+
+If a message cannot be published (for example because the backend is unavailable), the promise returned by `publish()` will reject.
+
+## Backend errors
+
+If the backend encounters an unrecoverable error (such as the RabbitMQ connection being lost), it emits an `'error'` event on the Announce instance and then closes the connection. You can listen for this event:
+
+```typescript
+announce.on('error', (err) => {
+  console.error('Announce error:', err)
+})
+```
+
+## Subscriber error isolation
+
+An error in one subscriber does not affect other subscribers. If the email notification subscriber fails, the analytics subscriber will continue to process its messages independently.
 
 # Using middleware
 
@@ -253,9 +433,55 @@ This is a list of the middlewares provided by Announce. See [Writing middleware]
 
 ## batch()
 
+`batch()` groups incoming messages together and delivers them to the subscriber as a single message whose body is an array of the batched messages. A batch is processed when it reaches `maxMessages` messages, or when `maxTime` milliseconds have elapsed since the first message in the batch arrived, whichever comes first.
+
+This is useful when it's more efficient to process items in bulk - for example, writing multiple records to a database in one query, or sending a summary email instead of many individual ones.
+
+### Options
+
+- `maxTime` (required): The maximum amount of time (in milliseconds) to wait before processing a batch.
+- `maxMessages` (required): The maximum number of messages a batch can contain.
+
+```typescript
+announce.use(batch({ maxTime: 5000, maxMessages: 100 }))
+
+await announce.subscribe({
+  queueName: 'bulk-insert',
+  topics: ['record.created'],
+  async handle(message) {
+    // message.body is an array of the original messages
+    const records = message.body.map(m => m.body)
+    await db.bulkInsert(records)
+  }
+})
+```
+
+Source: [batch.ts](./src/middleware/batch.ts)
+
 ## delay()
 
 `delay()` delays the processing of messages. This can be useful when Announce is being used as a job-processing system, or to wait until something has stopped happening before acting. For example the application may wish to email a summary of a conversation or series of actions to avoid spamming users.
+
+The delay is measured from when the message was _published_, not from when it was received. This means that if a message takes 3 seconds to reach the subscriber and the delay is 5 seconds, the subscriber will only wait an additional 2 seconds before processing the message.
+
+### Options
+
+- `delay` (required): How many milliseconds to delay messages by.
+- `variation` (number, optional): The random variation in delay, as a multiple of `delay`. For example, if `delay` is 50 and `variation` is 0.5, the actual delay for each message will be between 25ms and 75ms. Default: `0`.
+
+```typescript
+const delayedAnnounce = announce.with(delay({ delay: 5000 }))
+
+await delayedAnnounce.subscribe({
+  queueName: 'delayed-summary',
+  topics: ['activity.*'],
+  async handle(message) {
+    await sendActivitySummary(message.body)
+  }
+})
+```
+
+Source: [delay.ts](./src/middleware/delay.ts)
 
 ## log()
 
@@ -313,6 +539,8 @@ Source: [spy.ts](./src/middleware/spy.ts)
 
 ## subscriptionFilter()
 
+`subscriptionFilter()` controls which subscribers are allowed to subscribe. Subscriptions that don't match the filter are silently ignored. This is useful for creating specialised application instances that only handle certain queues, or for disabling subscriptions entirely (for example, in a web server that only publishes messages and doesn't process any).
+
 ### Options
 
 - `filter`: The filter to apply. Subscriptions that don't match the filter will be ignored. Can be a string (exact match on queueName), RegExp (tests on queueName), or a function that accepts the subscriber as its only argument.
@@ -321,51 +549,497 @@ Source: [subscriptionFilter.ts](./src/middleware/subscriptionFilter.ts)
 
 # Writing middleware
 
-See spy() example in retry.test.js
+Announce's middleware system allows you to hook into four operations: publishing, subscribing, message handling, and queue destruction. A middleware is a function that receives a `MiddlewareArgs` object and calls one or more `add*Middleware` functions to install its hooks.
+
+Here is a simple middleware that logs whenever a message is published:
+
+```typescript
+import { Middleware } from '@emigrad/announce'
+
+const logPublishes: () => Middleware = () => {
+  return ({ addPublishMiddleware }) => {
+    addPublishMiddleware(async ({ message, next }) => {
+      console.log(`Publishing to ${message.topic}`)
+      await next(message)
+      console.log(`Published to ${message.topic}`)
+    })
+  }
+}
+
+announce.use(logPublishes())
+```
+
+The `next` function passes control to the next middleware in the chain (or the backend, if there are no more middlewares). You **must** call `next` to continue the chain, or the operation will be silently dropped.
+
+## Available hooks
+
+Each `add*Middleware` function receives a different set of arguments:
+
+### `addPublishMiddleware(({ message, next }) => ...)`
+
+Called when a message is about to be published. Call `next(message)` to pass the message to the next middleware. You can modify the message before passing it on.
+
+### `addSubscribeMiddleware(({ subscriber, next }) => ...)`
+
+Called when a subscriber is being added. Call `next(subscriber)` to continue. You can modify the subscriber (for example, wrapping its `handle` function) before passing it on.
+
+### `addHandleMiddleware(({ message, subscriber, next }) => ...)`
+
+Called when a message is received by a subscriber. Call `next(message)` to pass the message to the next middleware and eventually the subscriber's handler.
+
+### `addDestroyQueueMiddleware(({ queueName, next }) => ...)`
+
+Called when a queue is being destroyed. Call `next(queueName)` to continue.
+
+## Additional capabilities
+
+The middleware function also receives:
+
+- `announce`: The Announce instance the middleware is being added to. Useful for listening to events like `'close'`.
+- `publish(...messages)`: Publishes messages, bypassing any middleware added _after_ this one. Useful for internal republishing (as done by `retry()`).
+- `destroyQueue(queueName)`: Destroys a queue, bypassing any middleware added after this one.
+
+## Example: a simple timing middleware
+
+```typescript
+const timing: () => Middleware = () => {
+  return ({ addHandleMiddleware }) => {
+    addHandleMiddleware(async ({ message, subscriber, next }) => {
+      const start = Date.now()
+      try {
+        await next(message)
+      } finally {
+        console.log(`${subscriber.queueName} took ${Date.now() - start}ms`)
+      }
+    })
+  }
+}
+```
+
+For more complete examples, see the source code of the built-in middlewares such as [spy.ts](./src/middleware/spy.ts) and [retry.ts](./src/middleware/retry.ts).
 
 # Writing backends
 
-# Design
+A backend is a class that implements the `Backend` interface and provides a static `accepts(url)` method. To create a custom backend:
+
+1. Implement the `Backend` interface:
+
+```typescript
+import { EventEmitter } from 'events'
+import { Backend, BackendSubscriber, Message, Middleware } from '@emigrad/announce'
+
+export class MyBackend extends EventEmitter implements Backend {
+  static accepts(url: string): boolean {
+    return url.startsWith('myprotocol://')
+  }
+
+  async publish(message: Message<Buffer>): Promise<void> {
+    // Send the message to all subscribers with matching topics
+  }
+
+  async subscribe(subscriber: BackendSubscriber): Promise<void> {
+    // Register the subscriber and start delivering matching messages
+  }
+
+  async destroyQueue(queueName: string): Promise<void> {
+    // Remove the queue and any unprocessed messages
+  }
+
+  async close(): Promise<void> {
+    // Close any connections and clean up resources
+  }
+
+  getPolyfills(): Middleware[] {
+    // Return any polyfill middlewares your backend needs.
+    // Use rejectMultipleSubscriptions() if your backend doesn't
+    // natively prevent duplicate subscriptions.
+    // Use deadLetterQueue() if your backend doesn't natively
+    // support dead letter queues.
+    return []
+  }
+}
+```
+
+2. Register it using a custom backend factory:
+
+```typescript
+import { Announce, backendFactory } from '@emigrad/announce'
+
+const announce = new Announce({
+  url: 'myprotocol://localhost',
+  backendFactory: backendFactory([MyBackend, ...defaultBackends])
+})
+```
+
+The backend must emit an `'error'` event if it encounters an unrecoverable error (such as a lost connection). This will cause the Announce instance to close.
 
 # Logging
 
+Announce supports two kinds of logging:
+
+## Application-level logging with `log()`
+
+The `log()` middleware logs message publishes, subscriptions, handled messages and errors through a logger of your choice. See the [log()](#log) section for details.
+
+## Debug logging
+
+Announce uses the [debug](https://www.npmjs.com/package/debug) package for low-level internal logging. To enable it, set the `DEBUG` environment variable:
+
+```shell
+# Log everything from Announce
+DEBUG=announce:* node app.js
+
+# Log only the InMemory backend
+DEBUG=announce:InMemory node app.js
+
+# Log only the FileBackend
+DEBUG=announce:FileBackend node app.js
+```
+
+This is useful for diagnosing issues with message delivery, queue management and backend connections.
+
 # Configuration
+
+Announce is configured primarily through environment variables and constructor arguments.
+
+## Environment variables
+
+- `ANNOUNCE_BACKEND_URL`: The URL of the backend to connect to. This is the primary configuration option.
+
+## Backend URLs
+
+| Backend | URL scheme | Example |
+|---------|-----------|---------|
+| InMemory | `memory://` | `memory://` |
+| File | `file://` | `file:///tmp/announce` |
+| RabbitMQ | `amqp://` or `amqps://` | `amqp://user:pass@localhost:5672/events` |
+
+For the RabbitMQ backend, the path component of the URL is used as the exchange name. If no path is provided, the exchange defaults to `events`.
+
+## Subscriber options
+
+- `concurrency`: How many messages can be processed simultaneously by a single subscriber. Default: `1`. Increase this for subscribers that spend most of their time waiting on I/O.
+- `preserveRejectedMessages`: Whether to save rejected messages in a dead letter queue. Default: `true`.
 
 # Subscribing
 
+To receive messages, add a subscriber using `announce.subscribe()`:
+
+```typescript
+await announce.subscribe({
+  queueName: 'send-welcome-emails',
+  topics: ['user.created'],
+  async handle(message, { announce }) {
+    await sendWelcomeEmail(message.body.email)
+  }
+})
+```
+
+You can subscribe to multiple topics at once:
+
+```typescript
+await announce.subscribe({
+  queueName: 'user-audit-log',
+  topics: ['user.created', 'user.updated', 'user.deleted'],
+  async handle(message) {
+    await auditLog.write(message.topic, message.body)
+  }
+})
+```
+
+Use wildcards to match multiple topics:
+
+```typescript
+await announce.subscribe({
+  queueName: 'all-user-events',
+  topics: ['user.*'],       // matches user.created, user.deleted, etc.
+  handle: handleUserEvent
+})
+
+await announce.subscribe({
+  queueName: 'all-created-events',
+  topics: ['**.created'],    // matches user.created, org.membership.created, etc.
+  handle: handleCreatedEvent
+})
+```
+
+You can add multiple subscribers in a single call:
+
+```typescript
+await announce.subscribe(emailSubscriber, analyticsSubscriber, auditSubscriber)
+```
+
+## Concurrency
+
+By default, each subscriber processes one message at a time. To process multiple messages in parallel:
+
+```typescript
+await announce.subscribe({
+  queueName: 'image-processor',
+  topics: ['image.uploaded'],
+  options: { concurrency: 5 },
+  async handle(message) {
+    await processImage(message.body)
+  }
+})
+```
+
 # Publishing
 
-# Patterns
+To send a message, call `announce.publish()`:
 
-- Perform an action after things _stop_ happening
-  - When there are change logs
-  - When there aren't change logs
-- Webhooks
-  - Receiving events
-  - Sending events
-- Batch processing
-- Emails and push notifications
-  - (should be one message per email, so that users don't get emailed multiple times due to unrelated failures)
-- Job systems
-- Live query updates
-- Cache invalidation
-  - Direct invalidation
-  - Indirect invalidation
-- Soft start
+```typescript
+await announce.publish({
+  topic: 'user.created',
+  body: { id: 123, email: 'user@example.com' }
+})
+```
+
+You can publish multiple messages in a single call:
+
+```typescript
+await announce.publish(
+  { topic: 'user.created', body: newUser },
+  { topic: 'audit.entry', body: { action: 'user.created', userId: newUser.id } }
+)
+```
+
+The returned promise resolves with an array of the published messages, each with its `id` and `date` properties filled in:
+
+```typescript
+const [message] = await announce.publish({ topic: 'test', body: { hello: 'world' } })
+console.log(message.properties.id)   // unique ID
+console.log(message.properties.date) // publication date
+```
+
+You can also add custom headers:
+
+```typescript
+await announce.publish({
+  topic: 'order.placed',
+  body: order,
+  headers: { 'x-priority': 'high' }
+})
+```
 
 # Events
 
+The Announce instance is an `EventEmitter` and emits the following events:
+
+## `'error'`
+
+Emitted when the backend encounters an unrecoverable error. After emitting this event, the Announce instance will close.
+
+```typescript
+announce.on('error', (err) => {
+  console.error('Fatal announce error:', err)
+  process.exit(1)
+})
+```
+
+## `'close'`
+
+Emitted after the Announce instance has closed.
+
+```typescript
+announce.on('close', () => {
+  console.log('Announce has shut down')
+})
+```
+
 # Writing unit tests
 
-# Usage with TypeDI
+Announce is designed to be easy to test. The `memory://` backend runs entirely in-process with no external dependencies, making it ideal for unit tests.
+
+## Basic test setup
+
+```typescript
+import { Announce, json } from '@emigrad/announce'
+
+describe('my subscriber', () => {
+  let announce: Announce
+
+  beforeEach(() => {
+    announce = new Announce({ url: 'memory://' })
+    announce.use(json())
+  })
+
+  afterEach(() => announce.close())
+
+  it('should process messages', async () => {
+    const received: any[] = []
+
+    await announce.subscribe({
+      queueName: 'test',
+      topics: ['user.created'],
+      handle(message) {
+        received.push(message.body)
+      }
+    })
+
+    await announce.publish({ topic: 'user.created', body: { id: 1 } })
+
+    // Allow the message to be processed
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    expect(received).toEqual([{ id: 1 }])
+  })
+})
+```
+
+## Using `spy()` to wait for message processing
+
+The `spy()` middleware is particularly useful in tests because it provides hooks that let you know when messages have been processed, removing the need for arbitrary timeouts:
+
+```typescript
+import { Announce, json, spy } from '@emigrad/announce'
+import { Deferred } from 'ts-deferred'
+
+it('should handle user creation', async () => {
+  const handled = new Deferred()
+  const announce = new Announce({ url: 'memory://' })
+  announce.use(json(), spy({ onHandle: handled.resolve }))
+
+  await announce.subscribe({
+    queueName: 'test',
+    topics: ['user.created'],
+    handle(message) {
+      // your handler logic
+    }
+  })
+
+  await announce.publish({ topic: 'user.created', body: { id: 1 } })
+  await handled.promise // resolves as soon as the handler finishes
+
+  await announce.close()
+})
+```
+
+## Testing that messages are published
+
+Use the `spy()` middleware to verify that your code publishes the expected messages:
+
+```typescript
+it('should publish an event when a comment is added', async () => {
+  const published = new Deferred()
+  const announce = new Announce({ url: 'memory://' })
+  announce.use(json(), spy({ onPublish: published.resolve }))
+
+  await addComment(announce, { postId: 1, text: 'Great post!' })
+
+  const { message } = await published.promise
+  expect(message.topic).toBe('comment.created')
+})
+```
 
 # Backends
 
+## InMemory backend
+
+**URL:** `memory://`
+
+A simple in-memory backend suitable for development and testing. Messages are lost when the process exits. Only a single instance of the application can send and receive messages.
+
+```dotenv
+ANNOUNCE_BACKEND_URL=memory://
+```
+
+## File backend
+
+**URL:** `file://<path>`
+
+A filesystem-backed backend that provides at-least-once delivery guarantees. Messages are persisted to disk and survive application restarts. Multiple processes on the same machine can share a single file backend.
+
+```dotenv
+ANNOUNCE_BACKEND_URL=file:///tmp/announce
+```
+
+**Limitations:**
+- Only works with local filesystems. Network filesystems (NFS, SMB) are not supported because they don't reliably provide file change notifications.
+- Not suitable for multi-machine deployments. Use RabbitMQ instead.
+
+**Features:**
+- Guaranteed delivery
+- Dead letter queues
+- Survives application restarts
+- Multiple local processes can share the same backend
+
+## RabbitMQ backend
+
+**URL:** `amqp://<host>` or `amqps://<host>`
+
+A production-ready backend that connects to [RabbitMQ](https://www.rabbitmq.com/). Suitable for multi-instance and multi-service deployments.
+
+```dotenv
+ANNOUNCE_BACKEND_URL=amqp://user:password@rabbitmq.example.com:5672/events
+```
+
+The path component of the URL is used as the RabbitMQ exchange name (defaults to `events` if not specified). The exchange is created as a topic exchange.
+
+**Requirements:**
+- The `amqplib` package must be installed: `yarn add amqplib`
+
+**Features:**
+- Guaranteed delivery
+- Dead letter queues (native RabbitMQ support)
+- Inter-service messaging
+- Multiple application instances
+- Messages persist across restarts (when using durable queues)
+
+### Running RabbitMQ locally
+
+A `docker-compose.yml` is included for running RabbitMQ during development:
+
+```shell
+yarn services:start
+```
+
+This starts RabbitMQ with the management plugin on `amqp://localhost:5672` (management UI at `http://localhost:15672`).
+
 # Troubleshooting
 
-- My subscriber doesn't receive message - (check topics, check that subscriber was added, check that message was sent, if using multiple instances of announce check that they're pointing to the same server, if using multiple instances of announce, check that they're using a backend that supports that, check logs for errors)
-- Delay isn't delaying messages. Delay starts the clock from when the message was sent, not received
-- My rabbit server is disconnecting. Check that
-- My process is using too much memory. Reduce the concurrency setting. If using many subscribers, you may want to use a PromiseQueue to limit the number of messages processed simultaneously
-- Messages are being processed too slowly. Concurrency is 1 by default, try increasing
-- Turning on debug logging
+## My subscriber doesn't receive messages
+
+1. **Check the topics:** Ensure the subscriber's topic patterns match the published message's topic. Remember that `*` only matches a single level (`user.*` matches `user.created` but not `user.account.created`), while `**` matches zero or more levels.
+2. **Check subscriber registration:** Make sure `await announce.subscribe(...)` completed before the message was published.
+3. **Check the backend URL:** If using multiple Announce instances, ensure they all point to the same backend.
+4. **Check the backend type:** The InMemory backend only delivers messages to subscribers within the same process. For cross-process messaging, use the File or RabbitMQ backend.
+5. **Check the logs:** Add the `log()` middleware and check for errors.
+6. **Enable debug logging:** Set `DEBUG=announce:*` to see low-level backend activity.
+
+## Delay isn't delaying messages
+
+The `delay()` middleware measures the delay from when the message was _published_, not from when it was received. If the message takes longer to arrive than the configured delay, it will be processed immediately.
+
+## My RabbitMQ connection keeps disconnecting
+
+Check that:
+1. The RabbitMQ server is running and reachable.
+2. The credentials in the URL are correct.
+3. No firewall or network policy is dropping idle connections.
+4. The RabbitMQ server has enough resources (memory, disk space).
+
+## My process is using too much memory
+
+Reduce the `concurrency` setting on your subscribers. Each in-flight message consumes memory, so a high concurrency with large messages can add up. If you have many subscribers, consider using `subscriptionFilter()` to spread them across multiple processes.
+
+## Messages are being processed too slowly
+
+The default `concurrency` is `1`, meaning messages are processed one at a time. Try increasing it:
+
+```typescript
+await announce.subscribe({
+  queueName: 'slow-subscriber',
+  topics: ['work.*'],
+  options: { concurrency: 10 },
+  handle: processWork
+})
+```
+
+## How to turn on debug logging
+
+Set the `DEBUG` environment variable before starting your application:
+
+```shell
+DEBUG=announce:* node app.js
+```
